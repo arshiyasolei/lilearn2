@@ -1,37 +1,70 @@
 
 // constants from prev codebase
-const PAWN_WHITE: i32  =  2;
-const PAWN_BLACK: i32  = 1;
-const ROOK_WHITE: i32  = 10;
-const ROOK_BLACK: i32  = 5;
-const KNIGHT_WHITE: i32  = 11;
-const KNIGHT_BLACK: i32  = 4;
-const QUEEN_WHITE: i32  = 13;
-const QUEEN_BLACK: i32 =  6;
-const BISHOP_WHITE: i32  = 12;
-const BISHOP_BLACK: i32 =  3;
-const KING_BLACK: i32 =  7;
-const KING_WHITE: i32  = 14;
-const STAR_VALUE: i32  = 99;
+pub const PAWN_WHITE: i32  =  2;
+pub const PAWN_BLACK: i32  = 1;
+pub const ROOK_WHITE: i32  = 10;
+pub const ROOK_BLACK: i32  = 5;
+pub const KNIGHT_WHITE: i32  = 11;
+pub const KNIGHT_BLACK: i32  = 4;
+pub const QUEEN_WHITE: i32  = 13;
+pub const QUEEN_BLACK: i32 =  6;
+pub const BISHOP_WHITE: i32  = 12;
+pub const BISHOP_BLACK: i32 =  3;
+pub const KING_BLACK: i32 =  7;
+pub const KING_WHITE: i32  = 14;
+pub const STAR_VALUE: i32  = 99;
 
+#[derive(Debug)]
 pub struct MovePiece {
-    i: usize,
-    j: usize,
-    goal_i: usize,
-    goal_j: usize
+    pub i: usize,
+    pub j: usize,
+    pub goal_i: usize,
+    pub goal_j: usize
 }
 
-struct LiBoard {
+pub struct LiBoard {
     // 8x8 board
-    board: [[i32; 8]; 8] 
+    pub board: [[i32; 8]; 8],
+    pub main_piece: (i32, i32),
+    pub num_star_cnt: i32
 }
 
 impl LiBoard {
 
     // set up board randomly with n stars and choice piece 
     pub fn new(star_cnt: u8, choice_piece: i32) -> LiBoard {
+        use rand;
         let mut b = [[0; 8] ; 8];
-        LiBoard { board: b }
+        let mut star_pairs = Vec::new();
+        let mut already_added_stars = HashMap::new();
+
+        let mut main_piece_i = rand::random::<u8>() % 8;
+        let mut main_piece_j = rand::random::<u8>() % 8;
+        already_added_stars.insert((main_piece_i, main_piece_j),0);
+        for v in 0..star_cnt {
+            let mut sample = (rand::random::<u8>() % 8, rand::random::<u8>() % 8);
+            while already_added_stars.contains_key(&sample) {
+                sample = (rand::random::<u8>() % 8, rand::random::<u8>() % 8);
+            }
+            already_added_stars.insert(sample,0);
+            star_pairs.push(sample);
+        }
+    
+        for i in 0..8 {
+            for j in 0..8 {
+                if i == main_piece_i && j == main_piece_j {
+                    b[i as usize][j as usize] = choice_piece;
+                } else {
+                    b[i as usize][j as usize] = 0;
+                }
+            }
+        }
+
+        for i in 0..star_cnt {
+            b[star_pairs[i as usize].0 as usize][star_pairs[i as usize].1 as usize] = STAR_VALUE;
+        }
+
+        LiBoard { board: b, main_piece: (main_piece_i as i32,main_piece_j as i32), num_star_cnt: star_cnt as i32 }
     }
 
     pub fn is_jumping_over_piece(&self, m_piece: &MovePiece) -> i32 {
@@ -219,6 +252,9 @@ impl LiBoard {
         // leap of faith
         // if the piece that we are trying to move exists
         let mut move_was_valid = 0;
+        if m_piece.i == m_piece.goal_i && m_piece.j == m_piece.goal_j {
+            return 0;
+        }
         if self.board[m_piece.i][m_piece.j] > 0 {
             match self.board[m_piece.i][m_piece.j] {
                 1 | 2 => return 1,
@@ -251,8 +287,95 @@ impl LiBoard {
     }
 }
 
+
+use std::{collections::HashMap, hash::Hash};
+use std::collections::VecDeque;
+use std::cmp;
+
+impl LiBoard {
+    // returns all the possible board combinations
+    // optimal way would be to see where we go with the current piece
+    // slight optimization before that would be to just start from that point
+    pub fn possible_moves(i: i32, j: i32) -> Vec<MovePiece> {
+        let mut moves = Vec::new();
+        for k  in 0..8 {
+            for l in 0..8 {
+                if i != k || j != l {
+                    moves.push(MovePiece {i: i as usize, j: j as usize, goal_i: k as usize, goal_j: l as usize});
+                } 
+            }
+        }
+        return moves;
+    }
+    // calculates the number of moves to optimally collect all stars
+    // The idea is to perform a breadth first search till the desired move is found
+    // TODO: make bidirectional BFS
+    pub fn num_optimal_moves_to_star(&self) -> i32 {
+        // pair of (num stars collected , board)
+        let mut max_stacksize = 1;
+        let mut visited: HashMap<[[i32; 8];8],i32> = HashMap::new();
+        let mut current_queue = VecDeque::new();
+
+        current_queue.push_back((0, 0, self.board,self.main_piece.0,self.main_piece.1));
+        let mut min_num = i32::MAX;
+        while !current_queue.is_empty() {
+            max_stacksize = cmp::max(max_stacksize, current_queue.len());
+            // get current board
+            let mut cur_board = LiBoard {
+                main_piece: (0,0), // doesn't matter here
+                num_star_cnt: 0, // doesn't matter either
+                board: current_queue.front().unwrap().2
+            };
+            // if board is not in visited
+            if !visited.contains_key(&cur_board.board) {
+                // add to visited
+                let cur_starcount = current_queue.front().unwrap().0;
+                let cur_move_count = current_queue.front().unwrap().1;
+                let piece_ipos = current_queue.front().unwrap().3;
+                let piece_jpos = current_queue.front().unwrap().4;
+                visited.insert(cur_board.board, cur_move_count);
+                if cur_starcount == self.num_star_cnt {
+                    min_num = cmp::min(current_queue.front().unwrap().1, min_num);
+                }
+                current_queue.pop_front();
+                for  temp_move in LiBoard::possible_moves(piece_ipos,piece_jpos) {
+                    if (temp_move.i != temp_move.goal_i ||
+                        temp_move.j != temp_move.goal_j) &&
+                        (cur_board.board[temp_move.i][temp_move.j] != 0 &&
+                        cur_board.board[temp_move.i][temp_move.j] != STAR_VALUE &&
+                        cur_board.validate_move(&temp_move) != 0) {
+                        // add this to currentQueue
+                        let backup = LiBoard {.. cur_board};
+                        let star_flag;
+                        if cur_board.board[temp_move.goal_i][temp_move.goal_j] == STAR_VALUE {
+                            star_flag = 1;
+                        } else {
+                            star_flag = 0;
+                        }
+
+                        cur_board.update_board(&temp_move);
+
+                        current_queue.push_back((cur_starcount + star_flag,
+                                                cur_move_count + 1,
+                                                cur_board.board,temp_move.goal_i as i32,temp_move.goal_j as i32));
+
+                        cur_board.board = backup.board;
+                    }
+                }
+
+            } else {
+                // if position of board is
+                current_queue.pop_front();
+            }
+        }
+        // println!("size of visited {}", visited.len());
+        return min_num;
+    }
+}
+
+
 impl Default for LiBoard {
     fn default() -> Self {
-        Self::new()
+        Self::new(5,QUEEN_WHITE)
     }
 }

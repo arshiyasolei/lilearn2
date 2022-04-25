@@ -1,8 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use eframe::{egui::{self, Sense}, epaint::Color32, emath::{Rect, Pos2, Vec2, Numeric}};
-
 mod chess;
+use chess::{LiBoard, MovePiece};
+use eframe::{
+    egui::{self, Sense, Ui},
+    emath::{Numeric, Pos2, Rect, Vec2},
+    epaint::{Color32, ColorImage, TextureHandle},
+};
+use std::path::Path;
+use std::{collections::HashMap, hash::Hash, ptr::NonNull};
 
 fn main() {
     let options = eframe::NativeOptions {
@@ -12,7 +18,6 @@ fn main() {
         ..Default::default()
     };
 
-
     eframe::run_native(
         "My app",
         options,
@@ -21,43 +26,123 @@ fn main() {
 }
 
 // store main app state here?...
+// egui has dragging implemented already !
 struct MyApp {
-    name: String,
-    age: u32,
+    textures: HashMap<i32, Option<egui::TextureHandle>>, // piece -> texture mapping
+    board: LiBoard,
+    cur_move_cnt: i32,
+    optimal_move_cnt: i32,
+
+}
+
+enum PieceStates {
+    Dragged(Rect, i32),            // where to draw image and what image to draw
+    DragReleased(Rect, MovePiece), // draw the image just before releasing
+    NoDrag,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
+        let b = chess::LiBoard::new(5, chess::QUEEN_WHITE);
+        let opt_cnt = b.num_optimal_moves_to_star();
         Self {
-            name: "Arshi".to_owned(),
-            age: 42,
+            textures: HashMap::new(),
+            board: b,
+            optimal_move_cnt: opt_cnt,
+            cur_move_cnt: 0
         }
     }
 }
 
+// piece paths (legacy code)
+static paths: [&str; 15] = [
+    "",
+    "images/black_pawn.png",
+    "images/white_pawn.png",
+    "images/black_bishop.png",
+    "images/black_knight.png",
+    "images/black_rook.png",
+    "images/black_queen.png",
+    "images/black_king.png",
+    "",
+    "",
+    "images/white_rook.png",
+    "images/white_knight.png",
+    "images/white_bishop.png",
+    "images/white_queen.png",
+    "images/white_king.png",
+];
+
+fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, image::ImageError> {
+    let image = image::io::Reader::open(path)?.decode()?;
+    let size = [image.width() as _, image.height() as _];
+    let image_buffer = image.to_rgba8();
+    let pixels = image_buffer.as_flat_samples();
+    Ok(egui::ColorImage::from_rgba_unmultiplied(
+        size,
+        pixels.as_slice(),
+    ))
+}
+
+fn get_texture<'a>(app: &'a mut MyApp,ui: &'a mut Ui , img_id: i32) -> &'a TextureHandle {
+    // where to draw currently dragged image
+    // insert id if it isn't there
+    if !app.textures.contains_key(&img_id) {
+        app.textures.insert(img_id, None);
+    }
+
+    app.textures
+        .get_mut(&img_id)
+        .unwrap()
+        .get_or_insert_with(|| {
+            let mut img;
+            let mut name;
+            if img_id == 99 {
+                // load star
+                img = load_image_from_path(Path::new("./images/star.png"))
+                    .unwrap();
+                name = "star_img";
+            } else {
+                img =
+                    load_image_from_path(Path::new(paths[img_id as usize]))
+                        .unwrap();
+                name = paths[img_id as usize];
+            }
+
+            ui.ctx().load_texture(name, img)
+        });
+
+    let texture = app.textures[&img_id].as_ref().unwrap();
+    texture
+}
+
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // ctx.set_visuals(egui::Visuals::dark());        
+        // ctx.set_visuals(egui::Visuals::dark());
         egui::containers::Window::new("chess window")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
             .show(ctx, |ui| {
-                let (r , res) = ui.allocate_at_least(ui.available_size(), Sense::click());
-            
+                ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
+                ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
+                // println!("{}",self.board.num_optimal_moves_to_star());
+                let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
+                let mut piece_state = PieceStates::NoDrag;
+
                 for i in 0..8 {
                     for j in 0..8 {
                         let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0);
                         let sq = Rect {
                             min: Pos2 {
-                                x: j as f32 *size + r.min.x,
-                                y: i as f32 *size + r.min.y
-                            }, 
+                                x: j as f32 * size + r.min.x,
+                                y: i as f32 * size + r.min.y,
+                            },
                             max: Pos2 {
-                                x: j as f32 *size + size + r.min.x,
-                                y: i as f32 *size + size + r.min.y
-                            }
+                                x: j as f32 * size + size + r.min.x,
+                                y: i as f32 * size + size + r.min.y,
+                            },
                         };
-                        let mut temp_color = Color32::BLACK;
+                        let mut temp_color = Color32::DARK_BLUE;
                         if j % 2 == 0 {
                             if i % 2 == 0 {
                                 temp_color = Color32::WHITE;
@@ -67,50 +152,115 @@ impl eframe::App for MyApp {
                                 temp_color = Color32::WHITE;
                             }
                         };
-                        ui.painter()
-                            .rect_filled(sq, 0.0, temp_color);
+                        let piece_resp = ui.allocate_rect(sq, Sense::drag());
+                        let cur_input_pos = ctx.input().pointer.interact_pos();
+
+                        if piece_resp.drag_released() {
+                            // done dragging here.. potentially update board state for next frame
+                            assert!(!piece_resp.dragged());
+                            let a = ctx.input().pointer.interact_pos();
+                            if a.is_some() && r.contains(a.unwrap()) {
+                                let a = a.unwrap();
+                                let goal_j = (a.x - r.min.x) / size;
+                                let goal_i = (a.y - r.min.y) / size;
+                                let image_rect = Rect {
+                                    min: Pos2 {
+                                        x: (goal_j as i32) as f32 * size + r.min.x,
+                                        y: (goal_i as i32) as f32 * size + r.min.y,
+                                    },
+                                    max: Pos2 {
+                                        x: (goal_j as i32) as f32 * size + size + r.min.x,
+                                        y: (goal_i as i32) as f32 * size + size + r.min.y,
+                                    },
+                                };
+                                piece_state = PieceStates::DragReleased(
+                                    image_rect,
+                                    MovePiece {
+                                        i: i as usize,
+                                        j: j as usize,
+                                        goal_i: goal_i as usize,
+                                        goal_j: goal_j as usize,
+                                    },
+                                );
+                            }
+
+                            ui.painter().rect_filled(sq, 0.0, temp_color);
+                        } else if piece_resp.dragged() {
+                            // currently dragging.. draw the texture at current mouse pos
+                            let piece_being_moved = self.board.board[i as usize][j as usize];
+                            if !cur_input_pos.is_none() && piece_being_moved != 0 {
+                                let cur_input_pos = cur_input_pos.unwrap();
+                                // draw at the center of mouse when grabbed
+                                let start_of_rec = Pos2 {
+                                    x: cur_input_pos.x - size / 2.0,
+                                    y: cur_input_pos.y - size / 2.0,
+                                };
+                                let end_of_rec = Pos2 {
+                                    x: start_of_rec.x + size,
+                                    y: start_of_rec.y + size,
+                                };
+                                let image_rect = Rect {
+                                    min: start_of_rec,
+                                    max: end_of_rec,
+                                };
+
+                                piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
+                            }
+                            ui.painter().rect_filled(sq, 0.0, temp_color);
+                        } else if !piece_resp.dragged() && !piece_resp.drag_released() {
+                            ui.painter().rect_filled(sq, 0.0, temp_color);
+                            // paint image
+                            let piece_being_moved = self.board.board[i as usize][j as usize];
+                            if piece_being_moved != 0 {
+                                let texture = get_texture(self,ui,piece_being_moved);
+                                // Show the image:
+                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
+                            }
+                        } else {
+                            ui.painter().rect_filled(sq, 0.0, temp_color);
+                        }
                     }
                 }
+
+                // draw the "dragged piece" here
+                match piece_state {
+                    PieceStates::Dragged(piece_rect, img_id) => {
+
+                       let texture = get_texture(self,ui,img_id);
+
+                        // Show the image:
+                        egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                    }
+                    PieceStates::DragReleased(piece_rect, move_piece) => {
+                        if self.board.validate_move(&move_piece) != 0 {
+                            self.board.update_board(&move_piece);
+                            let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
+                            let texture = get_texture(self,ui,img_id);
+                            // Show the image:
+                            egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                            
+                            self.cur_move_cnt += 1;
+                        }
+                    }
+                    _ => (),
+                }
+
+                /*
+                slow mode for debugging
+                 let mut i = i32::MAX;
+                 while i > 0  { i -= 20;}
+                 */
+                let new_round_btn = egui::Button::new("new round").sense(Sense::click_and_drag());
+
+                if ui.add(new_round_btn).clicked() {
+                    self.board = LiBoard::new(5, chess::QUEEN_WHITE);
+                    self.cur_move_cnt = 0;
+                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+
+                }
             });
-        
-        return;
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("My pog Application");
-            
-            ui.painter()
-                .rect_filled(Rect {min: Pos2 {x: 10.0, y: 50.0}, max: Pos2 {x: 100.0, y: 80.9}}, 0.1, Color32::YELLOW);
-                        
-            // ui.image(texture_id, size)
-            let small_btn = egui::Button::new("smol").sense(Sense::drag());
-            let poggers_resp = ui.add(small_btn);
-
-            let small_btn = egui::Button::new("smol").sense(Sense::drag());
-            
-            let btn_resp = ui.add(small_btn);
-            
-
-            if poggers_resp.dragged() {
-                println!("what");
-            }
-            
-            if btn_resp.dragged() {
-                
-                let Vec2 {x,y} = btn_resp.drag_delta();
-                println!("{} {}",x,y);
-                let cur_mouse_pos = ctx.input().pointer.interact_pos().unwrap();
-                let end_of_rec = Pos2 {x: cur_mouse_pos.x + 5.0, y: cur_mouse_pos.y + 5.0};
-                // paint the original button we are holding to some other color?
-                ui.painter()
-                .rect_filled(btn_resp.rect, 1.0, Color32::RED);
-
-                ui.painter()
-                .rect_filled(Rect {min: cur_mouse_pos, max: end_of_rec}, 1.0, Color32::RED);
-            } else {
-                println!("not dragged");
-            }
-        });
 
         // Resize the native window to be just the size we need it to be:
-        frame.set_window_size(ctx.used_size());
+        // frame.set_window_size(ctx.used_size());
     }
 }
