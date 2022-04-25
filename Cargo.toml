@@ -2,7 +2,7 @@
 name = "intro_rust"
 version = "0.1.0"
 edition = "2021"
-authors = ["arshia"]
+authors = ["Arshia S"]
 
 [dependencies]
 rodio = { version = "0.15.0", default-features = false, features = ["wav"] }
