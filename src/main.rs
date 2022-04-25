@@ -1,19 +1,20 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] //
 
 mod chess;
-use chess::{LiBoard, MovePiece};
+use chess::{LiBoard, MovePiece, QUEEN_WHITE};
 use eframe::{
     egui::{self, Sense, Ui},
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
-use std::path::Path;
+use tokio::io::{stdin, AsyncReadExt};
+use std::{path::Path, thread};
 use std::{collections::HashMap, hash::Hash, ptr::NonNull};
 
 fn main() {
     let options = eframe::NativeOptions {
         // Let's show off that we support transparent windows
-        transparent: true,
+        transparent: false,
         drag_and_drop_support: true,
         ..Default::default()
     };
@@ -23,6 +24,7 @@ fn main() {
         options,
         Box::new(|_cc| Box::new(MyApp::default())),
     );
+    
 }
 
 // store main app state here?...
@@ -32,7 +34,8 @@ struct MyApp {
     board: LiBoard,
     cur_move_cnt: i32,
     optimal_move_cnt: i32,
-
+    choice_piece: i32,
+    star_cnt: i32
 }
 
 enum PieceStates {
@@ -49,7 +52,9 @@ impl Default for MyApp {
             textures: HashMap::new(),
             board: b,
             optimal_move_cnt: opt_cnt,
-            cur_move_cnt: 0
+            cur_move_cnt: 0,
+            choice_piece: QUEEN_WHITE,
+            star_cnt: 5
         }
     }
 }
@@ -72,6 +77,27 @@ static paths: [&str; 15] = [
     "images/white_queen.png",
     "images/white_king.png",
 ];
+
+fn play_sound(path_to_file: &'static str) {
+    
+    thread::spawn(move || {
+        use std::fs::File;
+        use std::io::BufReader;
+        use rodio::{Decoder, OutputStream, source::Source};
+        // Get a output stream handle to the default physical sound device
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        // Load a sound from a file, using a path relative to Cargo.toml
+        let file = BufReader::new(File::open(path_to_file).unwrap());
+        // Decode that sound file into a source
+        let source = Decoder::new(file).unwrap();
+        // Play the sound directly on the device
+        stream_handle.play_raw(source.convert_samples());
+        
+        // The sound plays in a separate audio thread,
+        // so we need to keep the main thread alive while it's playing.
+       std::thread::sleep(std::time::Duration::from_millis(700));
+});
+}
 
 fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, image::ImageError> {
     let image = image::io::Reader::open(path)?.decode()?;
@@ -118,7 +144,27 @@ fn get_texture<'a>(app: &'a mut MyApp,ui: &'a mut Ui , img_id: i32) -> &'a Textu
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // ctx.set_visuals(egui::Visuals::dark());
+        ctx.set_visuals(egui::Visuals::dark());
+        egui::containers::Window::new("controls")
+        // .default_size(Vec2 {x: 400.0, y: 400.0})
+        .resizable(true)
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
+                ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
+                ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
+            });
+
+            ui.add(egui::Slider::new(&mut self.star_cnt, 5..=30));
+
+            let new_round_btn = egui::Button::new("new round");
+            if ui.add(new_round_btn).clicked() {
+                self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                self.cur_move_cnt = 0;
+                self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+
+            }
+        });
         egui::containers::Window::new("chess window")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
@@ -233,31 +279,42 @@ impl eframe::App for MyApp {
                     }
                     PieceStates::DragReleased(piece_rect, move_piece) => {
                         if self.board.validate_move(&move_piece) != 0 {
+                            if self.board.board[move_piece.goal_i][move_piece.goal_j] == chess::STAR_VALUE {
+                                play_sound("./sounds/capture.wav");
+                                self.board.num_star_cnt -= 1;
+                            } else {
+                                play_sound("./sounds/move.wav");
+                            }
                             self.board.update_board(&move_piece);
-                            let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
-                            let texture = get_texture(self,ui,img_id);
+                            // let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
+                            // let texture = get_texture(self,ui,img_id);
                             // Show the image:
-                            egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
-                            
+                            // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                            if self.board.num_star_cnt == 0 {
+                                play_sound("./sounds/win.wav");
+                            }
                             self.cur_move_cnt += 1;
+                        }
+                        let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
+                        if img_id != 0 {
+                        let texture = get_texture(self,ui,img_id);
+                        egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                         }
                     }
                     _ => (),
                 }
 
+                if self.board.num_star_cnt == 0 {
+                    ui.label(egui::RichText::new("You finished!").color(Color32::LIGHT_GREEN).size(30.0));
+                }
+
                 /*
-                slow mode for debugging
+                //slow mode for debugging
                  let mut i = i32::MAX;
                  while i > 0  { i -= 20;}
                  */
-                let new_round_btn = egui::Button::new("new round").sense(Sense::click_and_drag());
 
-                if ui.add(new_round_btn).clicked() {
-                    self.board = LiBoard::new(5, chess::QUEEN_WHITE);
-                    self.cur_move_cnt = 0;
-                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
 
-                }
             });
 
         // Resize the native window to be just the size we need it to be:
