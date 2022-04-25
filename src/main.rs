@@ -157,6 +157,8 @@ impl eframe::App for MyApp {
 
             ui.add(egui::Slider::new(&mut self.star_cnt, 5..=30));
 
+            // egui::color_picker::color_picker_color32(ui, srgba, egui::color_picker::Alpha::BlendOrAdditive);
+
             let new_round_btn = egui::Button::new("new round");
             if ui.add(new_round_btn).clicked() {
                 self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);

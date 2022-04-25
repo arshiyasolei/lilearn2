@@ -336,6 +336,7 @@ impl LiBoard {
                 visited.insert(cur_board.board, cur_move_count);
                 if cur_starcount == self.num_star_cnt {
                     min_num = cmp::min(current_queue.front().unwrap().1, min_num);
+                    return min_num;
                 }
                 current_queue.pop_front();
                 for  temp_move in LiBoard::possible_moves(piece_ipos,piece_jpos) {
