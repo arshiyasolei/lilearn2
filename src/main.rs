@@ -7,9 +7,9 @@ use eframe::{
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
-use tokio::io::{stdin, AsyncReadExt};
-use std::{path::Path, thread};
 use std::{collections::HashMap, hash::Hash, ptr::NonNull};
+use std::{path::Path, thread};
+use tokio::io::{stdin, AsyncReadExt};
 
 fn main() {
     let options = eframe::NativeOptions {
@@ -24,7 +24,6 @@ fn main() {
         options,
         Box::new(|_cc| Box::new(MyApp::default())),
     );
-    
 }
 
 // store main app state here?...
@@ -35,7 +34,9 @@ struct MyApp {
     cur_move_cnt: i32,
     optimal_move_cnt: i32,
     choice_piece: i32,
-    star_cnt: i32
+    star_cnt: i32,
+    board_light_sq_color: Color32,
+    board_dark_sq_color: Color32,
 }
 
 enum PieceStates {
@@ -54,7 +55,9 @@ impl Default for MyApp {
             optimal_move_cnt: opt_cnt,
             cur_move_cnt: 0,
             choice_piece: QUEEN_WHITE,
-            star_cnt: 5
+            star_cnt: 5,
+            board_light_sq_color: Color32::WHITE,
+            board_dark_sq_color: Color32::DARK_BLUE,
         }
     }
 }
@@ -79,11 +82,10 @@ static paths: [&str; 15] = [
 ];
 
 fn play_sound(path_to_file: &'static str) {
-    
     thread::spawn(move || {
+        use rodio::{source::Source, Decoder, OutputStream};
         use std::fs::File;
         use std::io::BufReader;
-        use rodio::{Decoder, OutputStream, source::Source};
         // Get a output stream handle to the default physical sound device
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         // Load a sound from a file, using a path relative to Cargo.toml
@@ -92,11 +94,11 @@ fn play_sound(path_to_file: &'static str) {
         let source = Decoder::new(file).unwrap();
         // Play the sound directly on the device
         stream_handle.play_raw(source.convert_samples());
-        
+
         // The sound plays in a separate audio thread,
         // so we need to keep the main thread alive while it's playing.
-       std::thread::sleep(std::time::Duration::from_millis(700));
-});
+        std::thread::sleep(std::time::Duration::from_millis(700));
+    });
 }
 
 fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, image::ImageError> {
@@ -110,7 +112,7 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
     ))
 }
 
-fn get_texture<'a>(app: &'a mut MyApp,ui: &'a mut Ui , img_id: i32) -> &'a TextureHandle {
+fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i32) -> &'a TextureHandle {
     // where to draw currently dragged image
     // insert id if it isn't there
     if !app.textures.contains_key(&img_id) {
@@ -125,13 +127,10 @@ fn get_texture<'a>(app: &'a mut MyApp,ui: &'a mut Ui , img_id: i32) -> &'a Textu
             let mut name;
             if img_id == 99 {
                 // load star
-                img = load_image_from_path(Path::new("./images/star.png"))
-                    .unwrap();
+                img = load_image_from_path(Path::new("./images/star.png")).unwrap();
                 name = "star_img";
             } else {
-                img =
-                    load_image_from_path(Path::new(paths[img_id as usize]))
-                        .unwrap();
+                img = load_image_from_path(Path::new(paths[img_id as usize])).unwrap();
                 name = paths[img_id as usize];
             }
 
@@ -144,35 +143,59 @@ fn get_texture<'a>(app: &'a mut MyApp,ui: &'a mut Ui , img_id: i32) -> &'a Textu
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        ctx.set_visuals(egui::Visuals::dark());
+        let mut visuals = egui::Visuals::dark();
+        visuals.override_text_color = Some(Color32::from_gray(200));
+        visuals.window_shadow = egui::epaint::Shadow::small_dark();
+        ctx.set_visuals(visuals);
         egui::containers::Window::new("controls")
-        // .default_size(Vec2 {x: 400.0, y: 400.0})
-        .resizable(true)
-        .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
-                ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
-                ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
-            });
-
-            ui.add(egui::Slider::new(&mut self.star_cnt, 5..=30));
-
-            // egui::color_picker::color_picker_color32(ui, srgba, egui::color_picker::Alpha::BlendOrAdditive);
-
-            let new_round_btn = egui::Button::new("new round");
-            if ui.add(new_round_btn).clicked() {
-                self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
-                self.cur_move_cnt = 0;
-                self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
-
-            }
-        });
-        egui::containers::Window::new("chess window")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
             .show(ctx, |ui| {
+                
+                /*
+                centers
+                ui.columns(5, |col| {
+                    col[1].radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
+                    col[2].radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
+                    col[3].radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
+                });
+                */
+                ui.horizontal( |ui| {
+                    ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
+                    ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
+                    ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
+                });
+                ui.add(
+                    egui::Slider::new(&mut self.star_cnt, 1..=13));
+
+                // pick board colors
+                ui.horizontal(|ui| {
+                    ui.label("dark piece color picker: ");
+                    ui.color_edit_button_srgba(&mut self.board_light_sq_color);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("light piece color picker: ");
+                    ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
+            });
+
+                let new_round_btn = egui::Button::new("new round");
+                if ui.add(new_round_btn).clicked() {
+                    self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                    self.cur_move_cnt = 0;
+                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                }
+
+
+            });
+
+        egui::containers::Window::new("chess window")
+            // .default_size(Vec2 {x: 400.0, y: 400.0})
+            .resizable(true)
+            .scroll2([false,true])
+            .show(ctx, |ui| {
                 ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
                 ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
+                ui.add_space(5.0);
                 // println!("{}",self.board.num_optimal_moves_to_star());
                 let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
                 let mut piece_state = PieceStates::NoDrag;
@@ -190,14 +213,14 @@ impl eframe::App for MyApp {
                                 y: i as f32 * size + size + r.min.y,
                             },
                         };
-                        let mut temp_color = Color32::DARK_BLUE;
+                        let mut temp_color = self.board_dark_sq_color;
                         if j % 2 == 0 {
                             if i % 2 == 0 {
-                                temp_color = Color32::WHITE;
+                                temp_color = self.board_light_sq_color;
                             }
                         } else {
                             if i % 2 == 1 {
-                                temp_color = Color32::WHITE;
+                                temp_color = self.board_light_sq_color;
                             }
                         };
                         let piece_resp = ui.allocate_rect(sq, Sense::drag());
@@ -260,7 +283,7 @@ impl eframe::App for MyApp {
                             // paint image
                             let piece_being_moved = self.board.board[i as usize][j as usize];
                             if piece_being_moved != 0 {
-                                let texture = get_texture(self,ui,piece_being_moved);
+                                let texture = get_texture(self, ui, piece_being_moved);
                                 // Show the image:
                                 egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
                             }
@@ -273,15 +296,16 @@ impl eframe::App for MyApp {
                 // draw the "dragged piece" here
                 match piece_state {
                     PieceStates::Dragged(piece_rect, img_id) => {
-
-                       let texture = get_texture(self,ui,img_id);
+                        let texture = get_texture(self, ui, img_id);
 
                         // Show the image:
                         egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                     }
                     PieceStates::DragReleased(piece_rect, move_piece) => {
                         if self.board.validate_move(&move_piece) != 0 {
-                            if self.board.board[move_piece.goal_i][move_piece.goal_j] == chess::STAR_VALUE {
+                            if self.board.board[move_piece.goal_i][move_piece.goal_j]
+                                == chess::STAR_VALUE
+                            {
                                 play_sound("./sounds/capture.wav");
                                 self.board.num_star_cnt -= 1;
                             } else {
@@ -299,15 +323,22 @@ impl eframe::App for MyApp {
                         }
                         let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
                         if img_id != 0 {
-                        let texture = get_texture(self,ui,img_id);
-                        egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                            let texture = get_texture(self, ui, img_id);
+                            egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                         }
                     }
                     _ => (),
                 }
 
                 if self.board.num_star_cnt == 0 {
-                    ui.label(egui::RichText::new("You finished!").color(Color32::LIGHT_GREEN).size(30.0));
+                    ui.vertical_centered_justified(|ui| {
+                    ui.add_space(5.0);
+                    ui.label(
+                        egui::RichText::new("You finished!")
+                            .color(Color32::LIGHT_GREEN)
+                            .size(25.0),
+                    );
+                });
                 }
 
                 /*
@@ -315,8 +346,6 @@ impl eframe::App for MyApp {
                  let mut i = i32::MAX;
                  while i > 0  { i -= 20;}
                  */
-
-
             });
 
         // Resize the native window to be just the size we need it to be:
