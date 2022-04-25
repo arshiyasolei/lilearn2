@@ -191,7 +191,6 @@ impl eframe::App for MyApp {
         egui::containers::Window::new("chess window")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
-            .scroll2([false,true])
             .show(ctx, |ui| {
                 ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
                 ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
