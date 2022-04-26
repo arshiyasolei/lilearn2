@@ -37,6 +37,7 @@ struct MyApp {
     star_cnt: i32,
     board_light_sq_color: Color32,
     board_dark_sq_color: Color32,
+    auto_play: bool
 }
 
 enum PieceStates {
@@ -58,6 +59,7 @@ impl Default for MyApp {
             star_cnt: 5,
             board_light_sq_color: Color32::WHITE,
             board_dark_sq_color: Color32::DARK_BLUE,
+            auto_play: false
         }
     }
 }
@@ -177,14 +179,16 @@ impl eframe::App for MyApp {
                     ui.label("light piece color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
             });
-
+                ui.separator();
+                ui.checkbox(&mut self.auto_play, "Auto play");
+                ui.separator();
                 let new_round_btn = egui::Button::new("new round");
-                if ui.add(new_round_btn).clicked() {
+
+                if ui.add(new_round_btn).clicked() || (self.auto_play && self.board.num_star_cnt == 0) {
                     self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
                     self.cur_move_cnt = 0;
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 }
-
 
             });
 
@@ -223,8 +227,9 @@ impl eframe::App for MyApp {
                             }
                         };
                         let piece_resp = ui.allocate_rect(sq, Sense::drag());
+                        
                         let cur_input_pos = ctx.input().pointer.interact_pos();
-
+                        
                         if piece_resp.drag_released() {
                             // done dragging here.. potentially update board state for next frame
                             assert!(!piece_resp.dragged());
@@ -256,6 +261,7 @@ impl eframe::App for MyApp {
 
                             ui.painter().rect_filled(sq, 0.0, temp_color);
                         } else if piece_resp.dragged() {
+                            // println!("{:?} {:?} {:?} {:?} {:?}",r,cur_input_pos, (i,j), sq, piece_resp.rect);
                             // currently dragging.. draw the texture at current mouse pos
                             let piece_being_moved = self.board.board[i as usize][j as usize];
                             if !cur_input_pos.is_none() && piece_being_moved != 0 {
