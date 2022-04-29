@@ -16,11 +16,15 @@ fn main() {
         // Let's show off that we support transparent windows
         transparent: false,
         drag_and_drop_support: true,
+        min_window_size: Some(Vec2 {
+            x: 1000.0,
+            y: 600.0,
+        }),
         ..Default::default()
     };
 
     eframe::run_native(
-        "My app",
+        "LiLearn",
         options,
         Box::new(|_cc| Box::new(MyApp::default())),
     );
@@ -37,7 +41,7 @@ struct MyApp {
     star_cnt: i32,
     board_light_sq_color: Color32,
     board_dark_sq_color: Color32,
-    auto_play: bool
+    auto_play: bool,
 }
 
 enum PieceStates {
@@ -59,7 +63,7 @@ impl Default for MyApp {
             star_cnt: 5,
             board_light_sq_color: Color32::WHITE,
             board_dark_sq_color: Color32::DARK_BLUE,
-            auto_play: false
+            auto_play: false,
         }
     }
 }
@@ -153,7 +157,6 @@ impl eframe::App for MyApp {
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
             .show(ctx, |ui| {
-                
                 /*
                 centers
                 ui.columns(5, |col| {
@@ -162,34 +165,34 @@ impl eframe::App for MyApp {
                     col[3].radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
                 });
                 */
-                ui.horizontal( |ui| {
+                ui.horizontal(|ui| {
                     ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
                     ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
                     ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
                 });
-                ui.add(
-                    egui::Slider::new(&mut self.star_cnt, 1..=13));
+                ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
 
                 // pick board colors
                 ui.horizontal(|ui| {
-                    ui.label("dark piece color picker: ");
+                    ui.label("dark square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_light_sq_color);
                 });
                 ui.horizontal(|ui| {
-                    ui.label("light piece color picker: ");
+                    ui.label("light square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
-            });
+                });
                 ui.separator();
                 ui.checkbox(&mut self.auto_play, "Auto play");
                 ui.separator();
                 let new_round_btn = egui::Button::new("new round");
 
-                if ui.add(new_round_btn).clicked() || (self.auto_play && self.board.num_star_cnt == 0) {
+                if ui.add(new_round_btn).clicked()
+                    || (self.auto_play && self.board.num_star_cnt == 0)
+                {
                     self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
                     self.cur_move_cnt = 0;
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 }
-
             });
 
         egui::containers::Window::new("chess window")
@@ -227,9 +230,9 @@ impl eframe::App for MyApp {
                             }
                         };
                         let piece_resp = ui.allocate_rect(sq, Sense::drag());
-                        
+
                         let cur_input_pos = ctx.input().pointer.interact_pos();
-                        
+
                         if piece_resp.drag_released() {
                             // done dragging here.. potentially update board state for next frame
                             assert!(!piece_resp.dragged());
@@ -326,10 +329,16 @@ impl eframe::App for MyApp {
                             }
                             self.cur_move_cnt += 1;
                         }
-                        let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
-                        if img_id != 0 {
-                            let texture = get_texture(self, ui, img_id);
-                            egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                        // validate goali and j so they are within bounds
+                        if !( move_piece.goal_i >= 8
+                            || move_piece.goal_j >= 8)
+                        {
+                            let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
+                            if img_id != 0 {
+                                let texture = get_texture(self, ui, img_id);
+                                egui::Image::new(texture, texture.size_vec2())
+                                    .paint_at(ui, piece_rect);
+                            }
                         }
                     }
                     _ => (),
@@ -337,13 +346,13 @@ impl eframe::App for MyApp {
 
                 if self.board.num_star_cnt == 0 {
                     ui.vertical_centered_justified(|ui| {
-                    ui.add_space(5.0);
-                    ui.label(
-                        egui::RichText::new("You finished!")
-                            .color(Color32::LIGHT_GREEN)
-                            .size(25.0),
-                    );
-                });
+                        ui.add_space(5.0);
+                        ui.label(
+                            egui::RichText::new("You finished!")
+                                .color(Color32::LIGHT_GREEN)
+                                .size(25.0),
+                        );
+                    });
                 }
 
                 /*
