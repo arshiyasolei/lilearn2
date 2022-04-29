@@ -16,8 +16,8 @@ fn main() {
         // Let's show off that we support transparent windows
         transparent: false,
         drag_and_drop_support: true,
-        min_window_size: Some(Vec2 {
-            x: 1000.0,
+        initial_window_size: Some(Vec2 {
+            x: 900.0,
             y: 600.0,
         }),
         ..Default::default()
@@ -41,6 +41,7 @@ struct MyApp {
     star_cnt: i32,
     board_light_sq_color: Color32,
     board_dark_sq_color: Color32,
+    window_bg_color: Color32,
     auto_play: bool,
 }
 
@@ -61,9 +62,10 @@ impl Default for MyApp {
             cur_move_cnt: 0,
             choice_piece: QUEEN_WHITE,
             star_cnt: 5,
-            board_light_sq_color: Color32::WHITE,
+            board_light_sq_color: Color32::LIGHT_RED,
             board_dark_sq_color: Color32::DARK_BLUE,
             auto_play: false,
+            window_bg_color: Color32::BLACK
         }
     }
 }
@@ -99,11 +101,11 @@ fn play_sound(path_to_file: &'static str) {
         // Decode that sound file into a source
         let source = Decoder::new(file).unwrap();
         // Play the sound directly on the device
-        stream_handle.play_raw(source.convert_samples());
+        match stream_handle.play_raw(source.convert_samples()) {
+            Ok(_) => std::thread::sleep(std::time::Duration::from_millis(1400)),
+            Err(_) => ()
+        }
 
-        // The sound plays in a separate audio thread,
-        // so we need to keep the main thread alive while it's playing.
-        std::thread::sleep(std::time::Duration::from_millis(700));
     });
 }
 
@@ -156,6 +158,7 @@ impl eframe::App for MyApp {
         egui::containers::Window::new("controls")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
+            .default_pos(Pos2 {x: 30.0, y:30.0})
             .show(ctx, |ui| {
                 /*
                 centers
@@ -181,6 +184,10 @@ impl eframe::App for MyApp {
                     ui.label("light square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
                 });
+                ui.horizontal(|ui| {
+                    ui.label("window background color picker: ");
+                    ui.color_edit_button_srgba(&mut self.window_bg_color);
+                });
                 ui.separator();
                 ui.checkbox(&mut self.auto_play, "Auto play");
                 ui.separator();
@@ -198,6 +205,8 @@ impl eframe::App for MyApp {
         egui::containers::Window::new("chess window")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
+            .default_pos(Pos2 {x: 400.0, y:30.0})
+            .default_size(Vec2 {x: 400.0, y: 500.0})
             .show(ctx, |ui| {
                 ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
                 ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
@@ -364,5 +373,10 @@ impl eframe::App for MyApp {
 
         // Resize the native window to be just the size we need it to be:
         // frame.set_window_size(ctx.used_size());
+    }
+
+    fn clear_color(&self) -> egui::Rgba {
+        // sets window bg color
+        self.window_bg_color.into()
     }
 }

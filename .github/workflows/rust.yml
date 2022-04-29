@@ -28,6 +28,7 @@ jobs:
         files: lilearn.zip
         body: Lilearn release! 
         tag_name: alpha
+        generate_release_notes: true
     - name: Cache
       uses: actions/cache@v3
       with:
