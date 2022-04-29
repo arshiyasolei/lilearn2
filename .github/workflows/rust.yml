@@ -25,12 +25,12 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
     - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: lilearn.zip
-          body: Lilearn release! 
-          token: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: lilearn.zip
+        body: Lilearn release! 
+        token: ${{ secrets.GITHUB_TOKEN }}
 
 
 
