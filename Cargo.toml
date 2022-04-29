@@ -1,5 +1,5 @@
 [package]
-name = "intro_rust"
+name = "lilearn"
 version = "0.1.0"
 edition = "2021"
 authors = ["Arshia S"]
