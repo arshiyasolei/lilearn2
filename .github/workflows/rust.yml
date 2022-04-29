@@ -24,10 +24,19 @@ jobs:
         Compress-Archive -Path .\target\release\lilearn.exe , .\sounds, .\images  -CompressionLevel Optimal -DestinationPath lilearn.zip
     - name: Release
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
       with:
         files: lilearn.zip
         body: Lilearn release! 
+    - name: Cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
 
 
