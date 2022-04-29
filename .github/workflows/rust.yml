@@ -31,7 +31,6 @@ jobs:
           files: lilearn.zip
           body: Lilearn release! 
           token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          GITHUB_REPOSITORY: my_gh_org/my_gh_repo
+
 
 
