@@ -22,15 +22,12 @@ jobs:
       run: | 
         cargo build --release
         Compress-Archive -Path .\target\release\lilearn.exe , .\sounds, .\images  -CompressionLevel Optimal -DestinationPath lilearn.zip
-    - name: Run tests
-      run: cargo test --verbose
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: lilearn.zip
         body: Lilearn release! 
-        token: ${{ secrets.GITHUB_TOKEN }}
 
 
 
