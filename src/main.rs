@@ -17,6 +17,7 @@ fn main() {
         transparent: false,
         drag_and_drop_support: true,
         initial_window_size: Some(Vec2 { x: 730.0, y: 600.0 }),
+        vsync: false,
         ..Default::default()
     };
 
@@ -55,7 +56,7 @@ enum PieceStates {
     NoDrag,
 }
 
-const DEFAULT_TIMER: i32 = 500;
+const DEFAULT_TIMER: i32 = 2000;
 
 impl Default for MyApp {
     fn default() -> Self {
@@ -207,7 +208,7 @@ impl eframe::App for MyApp {
                 ui.menu_button("Timer", |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Set timer: ");
-                        ui.add(egui::Slider::new(&mut self.timer, 1..=2000));
+                        ui.add(egui::Slider::new(&mut self.timer, 1..=20000));
                     });
 
                     if ui.button("Close").clicked() {
@@ -427,11 +428,11 @@ impl eframe::App for MyApp {
                     }
                 });
 
-                /*
+                
                 //slow mode for debugging
                  let mut i = i32::MAX;
-                 while i > 0  { i -= 20;}
-                 */
+                // while i > 0  { i -= 20;}
+                 
             });
 
         // Resize the native window to be just the size we need it to be:
