@@ -18,6 +18,16 @@ jobs:
     - uses: actions/checkout@v3
       with: 
         submodules: 'recursive'
+    - name: Cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: | 
         cargo build --release
@@ -29,16 +39,6 @@ jobs:
         body: Lilearn release! 
         tag_name: alpha
         generate_release_notes: true
-    - name: Cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
 
 

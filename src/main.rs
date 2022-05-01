@@ -16,10 +16,7 @@ fn main() {
         // Let's show off that we support transparent windows
         transparent: false,
         drag_and_drop_support: true,
-        initial_window_size: Some(Vec2 {
-            x: 900.0,
-            y: 600.0,
-        }),
+        initial_window_size: Some(Vec2 { x: 730.0, y: 600.0 }),
         ..Default::default()
     };
 
@@ -29,6 +26,7 @@ fn main() {
         Box::new(|_cc| Box::new(MyApp::default())),
     );
 }
+
 
 // store main app state here?...
 // egui has dragging implemented already !
@@ -43,6 +41,12 @@ struct MyApp {
     board_dark_sq_color: Color32,
     window_bg_color: Color32,
     auto_play: bool,
+    // timer things
+    timed: bool, // see how many rounds you can complete in X minutes
+    timer: i32,  // using frames as ref
+    in_timed_round: bool,
+    cur_timed_num_wins: i32,
+    last_timed_game: Option<i32>,
 }
 
 enum PieceStates {
@@ -50,6 +54,8 @@ enum PieceStates {
     DragReleased(Rect, MovePiece), // draw the image just before releasing
     NoDrag,
 }
+
+const DEFAULT_TIMER: i32 = 500;
 
 impl Default for MyApp {
     fn default() -> Self {
@@ -65,13 +71,19 @@ impl Default for MyApp {
             board_light_sq_color: Color32::LIGHT_RED,
             board_dark_sq_color: Color32::DARK_BLUE,
             auto_play: false,
-            window_bg_color: Color32::BLACK
+            window_bg_color: Color32::BLACK,
+            // timers
+            timed: false,
+            timer: DEFAULT_TIMER,
+            in_timed_round: false,
+            cur_timed_num_wins: 0,
+            last_timed_game: None,
         }
     }
 }
 
-// piece paths (legacy code)
-static paths: [&str; 15] = [
+// piece PATHS (legacy code)
+static PATHS: [&str; 15] = [
     "",
     "images/black_pawn.png",
     "images/white_pawn.png",
@@ -103,9 +115,8 @@ fn play_sound(path_to_file: &'static str) {
         // Play the sound directly on the device
         match stream_handle.play_raw(source.convert_samples()) {
             Ok(_) => std::thread::sleep(std::time::Duration::from_millis(1400)),
-            Err(_) => ()
+            Err(_) => (),
         }
-
     });
 }
 
@@ -138,15 +149,14 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i32) -> &'a Textu
                 img = load_image_from_path(Path::new("./images/star.png")).unwrap();
                 name = "star_img";
             } else {
-                img = load_image_from_path(Path::new(paths[img_id as usize])).unwrap();
-                name = paths[img_id as usize];
+                img = load_image_from_path(Path::new(PATHS[img_id as usize])).unwrap();
+                name = PATHS[img_id as usize];
             }
 
             ui.ctx().load_texture(name, img)
         });
 
-    let texture = app.textures[&img_id].as_ref().unwrap();
-    texture
+    app.textures[&img_id].as_ref().unwrap()
 }
 
 impl eframe::App for MyApp {
@@ -155,59 +165,99 @@ impl eframe::App for MyApp {
         visuals.override_text_color = Some(Color32::from_gray(200));
         visuals.window_shadow = egui::epaint::Shadow::small_dark();
         ctx.set_visuals(visuals);
-        egui::containers::Window::new("controls")
+        egui::containers::Window::new("Controls")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
-            .default_pos(Pos2 {x: 30.0, y:30.0})
+            .default_pos(Pos2 { x: 20.0, y: 30.0 })
+            .default_size(Vec2 { x: 100.0, y: 300.0 })
             .show(ctx, |ui| {
                 /*
-                centers
-                ui.columns(5, |col| {
-                    col[1].radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
-                    col[2].radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
-                    col[3].radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
-                });
+                center with ui.columns..
                 */
                 ui.horizontal(|ui| {
                     ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
                     ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
                     ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
                 });
-                ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
+
+                ui.horizontal(|ui| {
+                    ui.label("Number of stars: ");
+                    ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
+                });
 
                 // pick board colors
                 ui.horizontal(|ui| {
-                    ui.label("dark square color picker: ");
+                    ui.label("Dark square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_light_sq_color);
                 });
                 ui.horizontal(|ui| {
-                    ui.label("light square color picker: ");
+                    ui.label("Light square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
                 });
                 ui.horizontal(|ui| {
-                    ui.label("window background color picker: ");
+                    ui.label("Window background color picker: ");
                     ui.color_edit_button_srgba(&mut self.window_bg_color);
                 });
-                ui.separator();
-                ui.checkbox(&mut self.auto_play, "Auto play");
-                ui.separator();
-                let new_round_btn = egui::Button::new("new round");
 
-                if ui.add(new_round_btn).clicked()
-                    || (self.auto_play && self.board.num_star_cnt == 0)
-                {
+                ui.separator();
+                if !self.timed {
+                    ui.checkbox(&mut self.auto_play, "Auto play");
+                }
+                ui.checkbox(&mut self.timed, "Timed rounds");
+                ui.menu_button("Timer", |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Set timer: ");
+                        ui.add(egui::Slider::new(&mut self.timer, 1..=2000));
+                    });
+
+                    if ui.button("Close").clicked() {
+                        ui.close_menu();
+                    }
+                });
+                ui.separator();
+                let new_round_btn = egui::Button::new("New round");
+
+                if ui.add(new_round_btn).clicked() {
+                    self.last_timed_game = None;
+                    self.cur_timed_num_wins = 0;
+                    
+                    if self.timed {
+                        self.auto_play = true;
+                        self.in_timed_round = true;
+                    }
+
+                    self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                    self.cur_move_cnt = 0;
+                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                }
+
+                if self.auto_play && self.board.num_star_cnt == 0 {
                     self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
                     self.cur_move_cnt = 0;
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 }
             });
 
-        egui::containers::Window::new("chess window")
+        egui::containers::Window::new("Chess window")
             // .default_size(Vec2 {x: 400.0, y: 400.0})
             .resizable(true)
-            .default_pos(Pos2 {x: 400.0, y:30.0})
-            .default_size(Vec2 {x: 400.0, y: 500.0})
+            .default_pos(Pos2 { x: 300.0, y: 30.0 })
+            .default_size(Vec2 { x: 400.0, y: 500.0 })
             .show(ctx, |ui| {
+                if self.in_timed_round {
+                    if self.timer == 0 {
+                        self.in_timed_round = false;
+                        self.last_timed_game = Some(self.cur_timed_num_wins);
+                        self.cur_timed_num_wins = 0;
+                        self.cur_move_cnt = 0;
+                        self.timer = DEFAULT_TIMER;
+                        // restart and create a new game
+                        self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                    } else {
+                        ui.label("Time left: ".to_owned() + &self.timer.to_string());
+                    }
+                }
                 ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
                 ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
                 ui.add_space(5.0);
@@ -339,9 +389,7 @@ impl eframe::App for MyApp {
                             self.cur_move_cnt += 1;
                         }
                         // validate goali and j so they are within bounds
-                        if !( move_piece.goal_i >= 8
-                            || move_piece.goal_j >= 8)
-                        {
+                        if !(move_piece.goal_i >= 8 || move_piece.goal_j >= 8) {
                             let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
                             if img_id != 0 {
                                 let texture = get_texture(self, ui, img_id);
@@ -353,16 +401,31 @@ impl eframe::App for MyApp {
                     _ => (),
                 }
 
-                if self.board.num_star_cnt == 0 {
-                    ui.vertical_centered_justified(|ui| {
-                        ui.add_space(5.0);
+                ui.vertical_centered_justified(|ui| {
+                    if self.board.num_star_cnt == 0 {
+                        self.cur_timed_num_wins += 1;
+                    }
+                    if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
+                        ui.add_space(6.0);
                         ui.label(
                             egui::RichText::new("You finished!")
                                 .color(Color32::LIGHT_GREEN)
-                                .size(25.0),
+                                .size(18.0),
                         );
-                    });
-                }
+                    }
+
+                    match self.last_timed_game {
+                        None => (),
+                        Some(v) => {
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new(format!("You won {} round(s) in your last timed game", v))
+                                    .color(Color32::LIGHT_GREEN)
+                                    .size(18.0),
+                            );
+                        }
+                    }
+                });
 
                 /*
                 //slow mode for debugging
@@ -373,6 +436,11 @@ impl eframe::App for MyApp {
 
         // Resize the native window to be just the size we need it to be:
         // frame.set_window_size(ctx.used_size());
+        if self.in_timed_round {
+            // reduce timer every frame
+            self.timer -= 1;
+        }
+        ctx.request_repaint();
     }
 
     fn clear_color(&self) -> egui::Rgba {
