@@ -44,6 +44,7 @@ struct MyApp {
     auto_play: bool,
     // timer things
     timed: bool, // see how many rounds you can complete in X minutes
+    starting_timer: i32,
     timer: i32,  // using frames as ref
     in_timed_round: bool,
     cur_timed_num_wins: i32,
@@ -55,8 +56,6 @@ enum PieceStates {
     DragReleased(Rect, MovePiece), // draw the image just before releasing
     NoDrag,
 }
-
-const DEFAULT_TIMER: i32 = 2000;
 
 impl Default for MyApp {
     fn default() -> Self {
@@ -75,10 +74,11 @@ impl Default for MyApp {
             window_bg_color: Color32::BLACK,
             // timers
             timed: false,
-            timer: DEFAULT_TIMER,
+            timer: 0,
             in_timed_round: false,
             cur_timed_num_wins: 0,
             last_timed_game: None,
+            starting_timer: 2000,
         }
     }
 }
@@ -166,11 +166,8 @@ impl eframe::App for MyApp {
         visuals.override_text_color = Some(Color32::from_gray(200));
         visuals.window_shadow = egui::epaint::Shadow::small_dark();
         ctx.set_visuals(visuals);
-        egui::containers::Window::new("Controls")
-            // .default_size(Vec2 {x: 400.0, y: 400.0})
+        egui::containers::SidePanel::left("Controls")
             .resizable(true)
-            .default_pos(Pos2 { x: 20.0, y: 30.0 })
-            .default_size(Vec2 { x: 100.0, y: 300.0 })
             .show(ctx, |ui| {
                 /*
                 center with ui.columns..
@@ -208,7 +205,7 @@ impl eframe::App for MyApp {
                 ui.menu_button("Timer", |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Set timer: ");
-                        ui.add(egui::Slider::new(&mut self.timer, 1..=20000));
+                        ui.add(egui::Slider::new(&mut self.starting_timer, 1..=20000));
                     });
 
                     if ui.button("Close").clicked() {
@@ -225,6 +222,7 @@ impl eframe::App for MyApp {
                     if self.timed {
                         self.auto_play = true;
                         self.in_timed_round = true;
+                        self.timer = self.starting_timer;
                     }
 
                     self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
@@ -239,11 +237,7 @@ impl eframe::App for MyApp {
                 }
             });
 
-        egui::containers::Window::new("Chess window")
-            // .default_size(Vec2 {x: 400.0, y: 400.0})
-            .resizable(true)
-            .default_pos(Pos2 { x: 300.0, y: 30.0 })
-            .default_size(Vec2 { x: 400.0, y: 500.0 })
+        egui::containers::CentralPanel::default()
             .show(ctx, |ui| {
                 if self.in_timed_round {
                     if self.timer == 0 {
@@ -251,7 +245,7 @@ impl eframe::App for MyApp {
                         self.last_timed_game = Some(self.cur_timed_num_wins);
                         self.cur_timed_num_wins = 0;
                         self.cur_move_cnt = 0;
-                        self.timer = DEFAULT_TIMER;
+                        self.timer = self.starting_timer;
                         // restart and create a new game
                         self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
