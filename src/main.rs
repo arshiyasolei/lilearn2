@@ -9,8 +9,6 @@ use eframe::{
 };
 use std::{collections::HashMap, hash::Hash, ptr::NonNull};
 use std::{path::Path, thread};
-use tokio::io::{stdin, AsyncReadExt};
-
 fn main() {
     let options = eframe::NativeOptions {
         // Let's show off that we support transparent windows
@@ -18,6 +16,7 @@ fn main() {
         drag_and_drop_support: true,
         initial_window_size: Some(Vec2 { x: 730.0, y: 550.0 }),
         vsync: false,
+        icon_data: Some(load_icon().unwrap()), 
         ..Default::default()
     };
 
@@ -120,6 +119,18 @@ fn play_sound(path_to_file: &'static str) {
     });
 }
 
+fn load_icon() -> Result< eframe::epi::IconData , image::ImageError>{
+    let image = image::io::Reader::open(Path::new("./images/icon.png"))?.decode()?;
+    let size = [image.width() as _, image.height() as _];
+    let image_buffer = image.to_rgba8();
+    let pixels = image_buffer.as_flat_samples();
+    Ok(eframe::epi::IconData {
+        rgba: image_buffer.to_vec(),
+        width: size[0],
+        height: size[1]
+    })
+}
+
 fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, image::ImageError> {
     let image = image::io::Reader::open(path)?.decode()?;
     let size = [image.width() as _, image.height() as _];
@@ -165,15 +176,16 @@ impl eframe::App for MyApp {
         let mut visuals = egui::Visuals::light();
         visuals.window_shadow = egui::epaint::Shadow::small_dark();
         visuals.widgets.noninteractive.bg_stroke.width = 0.0;
-        visuals.widgets.noninteractive.bg_fill = Color32::WHITE;
         ctx.tessellation_options().feathering_size_in_pixels = 0.3;
         ctx.set_visuals(visuals.clone());
-        let mut style: egui::Style = (*ctx.style()).clone();
-        style.spacing.indent = 30.0;
-        ctx.set_style(style);
         // TODO add new fonts
         egui::containers::SidePanel::left("Controls")
             .resizable(true)
+            .frame(egui::containers::Frame {
+                inner_margin: egui::style::Margin::from(15.0),
+                fill: Color32::WHITE,
+                ..Default::default()
+            })
             .show(ctx, |ui| {
                 ui.add_space(5.0);
                 ui.vertical_centered_justified(|ui| {
@@ -258,7 +270,13 @@ impl eframe::App for MyApp {
         visuals.override_text_color = Some(Color32::from_gray(240));
         visuals.widgets.noninteractive.bg_fill = Color32::BLACK;
         ctx.set_visuals(visuals);
-        egui::containers::CentralPanel::default().show(ctx, |ui| {
+        
+        egui::containers::CentralPanel::default()
+        .frame(egui::containers::Frame {
+            outer_margin: egui::style::Margin::from(25.0),
+            ..Default::default()
+        })    
+        .show(ctx, |ui| {
             if self.in_timed_round {
                 if self.timer == 0 {
                     self.in_timed_round = false;

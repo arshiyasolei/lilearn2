@@ -39,6 +39,7 @@ jobs:
         body: Lilearn release! 
         tag_name: alpha
         generate_release_notes: true
+        append_body: true
 
 
 
