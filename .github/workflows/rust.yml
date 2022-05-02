@@ -37,9 +37,8 @@ jobs:
       with:
         files: lilearn.zip
         body: Lilearn release! 
-        tag_name: alpha
+        tag_name: beta
         generate_release_notes: true
-        append_body: true
 
 
 
