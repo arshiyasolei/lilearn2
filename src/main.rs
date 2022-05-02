@@ -3,7 +3,7 @@
 mod chess;
 use chess::{LiBoard, MovePiece, QUEEN_WHITE};
 use eframe::{
-    egui::{self, Sense, Ui},
+    egui::{self, Sense, Ui, CollapsingHeader},
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
@@ -16,7 +16,7 @@ fn main() {
         // Let's show off that we support transparent windows
         transparent: false,
         drag_and_drop_support: true,
-        initial_window_size: Some(Vec2 { x: 730.0, y: 600.0 }),
+        initial_window_size: Some(Vec2 { x: 730.0, y: 550.0 }),
         vsync: false,
         ..Default::default()
     };
@@ -162,13 +162,23 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i32) -> &'a Textu
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        let mut visuals = egui::Visuals::dark();
-        visuals.override_text_color = Some(Color32::from_gray(200));
+        // Controls styles
+        let mut visuals = egui::Visuals::light();
         visuals.window_shadow = egui::epaint::Shadow::small_dark();
-        ctx.set_visuals(visuals);
+        visuals.widgets.noninteractive.bg_stroke.width = 0.0;
+        visuals.widgets.noninteractive.bg_fill = Color32::WHITE;
+        ctx.tessellation_options().feathering_size_in_pixels = 0.3;
+        ctx.set_visuals(visuals.clone());
+        let mut style: egui::Style = (*ctx.style()).clone();
+        style.spacing.indent = 30.0;
+        ctx.set_style(style);
+        // TODO add new fonts
         egui::containers::SidePanel::left("Controls")
             .resizable(true)
             .show(ctx, |ui| {
+                ui.add_space(5.0);
+                ui.heading("LiLearn");
+                ui.add_space(5.0);
                 /*
                 center with ui.columns..
                 */
@@ -197,11 +207,14 @@ impl eframe::App for MyApp {
                     ui.color_edit_button_srgba(&mut self.window_bg_color);
                 });
 
-                ui.separator();
+                ui.horizontal(|ui| {
                 if !self.timed {
                     ui.checkbox(&mut self.auto_play, "Auto play");
                 }
                 ui.checkbox(&mut self.timed, "Timed rounds");
+            });
+
+
                 ui.menu_button("Timer", |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Set timer: ");
@@ -212,7 +225,8 @@ impl eframe::App for MyApp {
                         ui.close_menu();
                     }
                 });
-                ui.separator();
+                
+                ui.add_space(2.0);
                 let new_round_btn = egui::Button::new("New round");
 
                 if ui.add(new_round_btn).clicked() {
@@ -235,8 +249,13 @@ impl eframe::App for MyApp {
                     self.cur_move_cnt = 0;
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 }
-            });
 
+            });
+        
+        // set window colors
+        visuals.override_text_color = Some(Color32::from_gray(200));
+        visuals.widgets.noninteractive.bg_fill = Color32::BLACK;
+        ctx.set_visuals(visuals);
         egui::containers::CentralPanel::default()
             .show(ctx, |ui| {
                 if self.in_timed_round {
@@ -397,7 +416,7 @@ impl eframe::App for MyApp {
                 }
 
                 ui.vertical_centered_justified(|ui| {
-                    if self.board.num_star_cnt == 0 {
+                    if self.board.num_star_cnt == 0 && self.cur_move_cnt == self.optimal_move_cnt {
                         self.cur_timed_num_wins += 1;
                     }
                     if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
@@ -424,7 +443,7 @@ impl eframe::App for MyApp {
 
                 
                 //slow mode for debugging
-                 let mut i = i32::MAX;
+                // let mut i = i32::MAX;
                 // while i > 0  { i -= 20;}
                  
             });
@@ -432,10 +451,10 @@ impl eframe::App for MyApp {
         // Resize the native window to be just the size we need it to be:
         // frame.set_window_size(ctx.used_size());
         if self.in_timed_round {
-            // reduce timer every frame
+            // reduce timer every frame and get every frame
             self.timer -= 1;
+            ctx.request_repaint();
         }
-        ctx.request_repaint();
     }
 
     fn clear_color(&self) -> egui::Rgba {
