@@ -3,7 +3,7 @@
 mod chess;
 use chess::{LiBoard, MovePiece, QUEEN_WHITE};
 use eframe::{
-    egui::{self, Sense, Ui, CollapsingHeader},
+    egui::{self, CollapsingHeader, Sense, Ui},
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
@@ -28,7 +28,6 @@ fn main() {
     );
 }
 
-
 // store main app state here?...
 // egui has dragging implemented already !
 struct MyApp {
@@ -45,7 +44,7 @@ struct MyApp {
     // timer things
     timed: bool, // see how many rounds you can complete in X minutes
     starting_timer: i32,
-    timer: i32,  // using frames as ref
+    timer: i32, // using frames as ref
     in_timed_round: bool,
     cur_timed_num_wins: i32,
     last_timed_game: Option<i32>,
@@ -177,7 +176,9 @@ impl eframe::App for MyApp {
             .resizable(true)
             .show(ctx, |ui| {
                 ui.add_space(5.0);
-                ui.heading("LiLearn");
+                ui.vertical_centered_justified(|ui| {
+                    ui.heading("LiLearn");
+                });
                 ui.add_space(5.0);
                 /*
                 center with ui.columns..
@@ -208,245 +209,245 @@ impl eframe::App for MyApp {
                 });
 
                 ui.horizontal(|ui| {
-                if !self.timed {
-                    ui.checkbox(&mut self.auto_play, "Auto play");
-                }
-                ui.checkbox(&mut self.timed, "Timed rounds");
-            });
+                    if !self.timed {
+                        ui.checkbox(&mut self.auto_play, "Auto play");
+                    }
+                    ui.checkbox(&mut self.timed, "Timed rounds");
+                });
 
+                ui.add_space(2.0);
+                ui.vertical_centered_justified(|ui| {
+                    ui.menu_button("Timer", |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Set timer: ");
+                            ui.add(egui::Slider::new(&mut self.starting_timer, 1..=20000));
+                        });
 
-                ui.menu_button("Timer", |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Set timer: ");
-                        ui.add(egui::Slider::new(&mut self.starting_timer, 1..=20000));
+                        if ui.button("Close").clicked() {
+                            ui.close_menu();
+                        }
                     });
 
-                    if ui.button("Close").clicked() {
-                        ui.close_menu();
+                    ui.add_space(2.0);
+                    let new_round_btn = egui::Button::new("New round");
+
+                    if ui.add(new_round_btn).clicked() {
+                        self.last_timed_game = None;
+                        self.cur_timed_num_wins = 0;
+
+                        if self.timed {
+                            self.auto_play = true;
+                            self.in_timed_round = true;
+                            self.timer = self.starting_timer;
+                        }
+
+                        self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                        self.cur_move_cnt = 0;
+                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                    }
+
+                    if self.auto_play && self.board.num_star_cnt == 0 {
+                        self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                        self.cur_move_cnt = 0;
+                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                     }
                 });
-                
-                ui.add_space(2.0);
-                let new_round_btn = egui::Button::new("New round");
-
-                if ui.add(new_round_btn).clicked() {
-                    self.last_timed_game = None;
-                    self.cur_timed_num_wins = 0;
-                    
-                    if self.timed {
-                        self.auto_play = true;
-                        self.in_timed_round = true;
-                        self.timer = self.starting_timer;
-                    }
-
-                    self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
-                    self.cur_move_cnt = 0;
-                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
-                }
-
-                if self.auto_play && self.board.num_star_cnt == 0 {
-                    self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
-                    self.cur_move_cnt = 0;
-                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
-                }
-
             });
-        
+
         // set window colors
-        visuals.override_text_color = Some(Color32::from_gray(200));
+        visuals.override_text_color = Some(Color32::from_gray(240));
         visuals.widgets.noninteractive.bg_fill = Color32::BLACK;
         ctx.set_visuals(visuals);
-        egui::containers::CentralPanel::default()
-            .show(ctx, |ui| {
-                if self.in_timed_round {
-                    if self.timer == 0 {
-                        self.in_timed_round = false;
-                        self.last_timed_game = Some(self.cur_timed_num_wins);
-                        self.cur_timed_num_wins = 0;
-                        self.cur_move_cnt = 0;
-                        self.timer = self.starting_timer;
-                        // restart and create a new game
-                        self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
-                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+        egui::containers::CentralPanel::default().show(ctx, |ui| {
+            if self.in_timed_round {
+                if self.timer == 0 {
+                    self.in_timed_round = false;
+                    self.last_timed_game = Some(self.cur_timed_num_wins);
+                    self.cur_timed_num_wins = 0;
+                    self.cur_move_cnt = 0;
+                    self.timer = self.starting_timer;
+                    // restart and create a new game
+                    self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                    self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                } else {
+                    ui.label("Time left: ".to_owned() + &self.timer.to_string());
+                }
+            }
+            ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
+            ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
+            ui.add_space(5.0);
+            // println!("{}",self.board.num_optimal_moves_to_star());
+            let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
+            let mut piece_state = PieceStates::NoDrag;
+
+            for i in 0..8 {
+                for j in 0..8 {
+                    let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0);
+                    let sq = Rect {
+                        min: Pos2 {
+                            x: j as f32 * size + r.min.x,
+                            y: i as f32 * size + r.min.y,
+                        },
+                        max: Pos2 {
+                            x: j as f32 * size + size + r.min.x,
+                            y: i as f32 * size + size + r.min.y,
+                        },
+                    };
+                    let mut temp_color = self.board_dark_sq_color;
+                    if j % 2 == 0 {
+                        if i % 2 == 0 {
+                            temp_color = self.board_light_sq_color;
+                        }
                     } else {
-                        ui.label("Time left: ".to_owned() + &self.timer.to_string());
-                    }
-                }
-                ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
-                ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
-                ui.add_space(5.0);
-                // println!("{}",self.board.num_optimal_moves_to_star());
-                let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
-                let mut piece_state = PieceStates::NoDrag;
-
-                for i in 0..8 {
-                    for j in 0..8 {
-                        let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0);
-                        let sq = Rect {
-                            min: Pos2 {
-                                x: j as f32 * size + r.min.x,
-                                y: i as f32 * size + r.min.y,
-                            },
-                            max: Pos2 {
-                                x: j as f32 * size + size + r.min.x,
-                                y: i as f32 * size + size + r.min.y,
-                            },
-                        };
-                        let mut temp_color = self.board_dark_sq_color;
-                        if j % 2 == 0 {
-                            if i % 2 == 0 {
-                                temp_color = self.board_light_sq_color;
-                            }
-                        } else {
-                            if i % 2 == 1 {
-                                temp_color = self.board_light_sq_color;
-                            }
-                        };
-                        let piece_resp = ui.allocate_rect(sq, Sense::drag());
-
-                        let cur_input_pos = ctx.input().pointer.interact_pos();
-
-                        if piece_resp.drag_released() {
-                            // done dragging here.. potentially update board state for next frame
-                            assert!(!piece_resp.dragged());
-                            let a = ctx.input().pointer.interact_pos();
-                            if a.is_some() && r.contains(a.unwrap()) {
-                                let a = a.unwrap();
-                                let goal_j = (a.x - r.min.x) / size;
-                                let goal_i = (a.y - r.min.y) / size;
-                                let image_rect = Rect {
-                                    min: Pos2 {
-                                        x: (goal_j as i32) as f32 * size + r.min.x,
-                                        y: (goal_i as i32) as f32 * size + r.min.y,
-                                    },
-                                    max: Pos2 {
-                                        x: (goal_j as i32) as f32 * size + size + r.min.x,
-                                        y: (goal_i as i32) as f32 * size + size + r.min.y,
-                                    },
-                                };
-                                piece_state = PieceStates::DragReleased(
-                                    image_rect,
-                                    MovePiece {
-                                        i: i as usize,
-                                        j: j as usize,
-                                        goal_i: goal_i as usize,
-                                        goal_j: goal_j as usize,
-                                    },
-                                );
-                            }
-
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
-                        } else if piece_resp.dragged() {
-                            // println!("{:?} {:?} {:?} {:?} {:?}",r,cur_input_pos, (i,j), sq, piece_resp.rect);
-                            // currently dragging.. draw the texture at current mouse pos
-                            let piece_being_moved = self.board.board[i as usize][j as usize];
-                            if !cur_input_pos.is_none() && piece_being_moved != 0 {
-                                let cur_input_pos = cur_input_pos.unwrap();
-                                // draw at the center of mouse when grabbed
-                                let start_of_rec = Pos2 {
-                                    x: cur_input_pos.x - size / 2.0,
-                                    y: cur_input_pos.y - size / 2.0,
-                                };
-                                let end_of_rec = Pos2 {
-                                    x: start_of_rec.x + size,
-                                    y: start_of_rec.y + size,
-                                };
-                                let image_rect = Rect {
-                                    min: start_of_rec,
-                                    max: end_of_rec,
-                                };
-
-                                piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
-                            }
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
-                        } else if !piece_resp.dragged() && !piece_resp.drag_released() {
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
-                            // paint image
-                            let piece_being_moved = self.board.board[i as usize][j as usize];
-                            if piece_being_moved != 0 {
-                                let texture = get_texture(self, ui, piece_being_moved);
-                                // Show the image:
-                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
-                            }
-                        } else {
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
+                        if i % 2 == 1 {
+                            temp_color = self.board_light_sq_color;
                         }
-                    }
-                }
+                    };
+                    let piece_resp = ui.allocate_rect(sq, Sense::drag());
 
-                // draw the "dragged piece" here
-                match piece_state {
-                    PieceStates::Dragged(piece_rect, img_id) => {
-                        let texture = get_texture(self, ui, img_id);
+                    let cur_input_pos = ctx.input().pointer.interact_pos();
 
-                        // Show the image:
-                        egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
-                    }
-                    PieceStates::DragReleased(piece_rect, move_piece) => {
-                        if self.board.validate_move(&move_piece) != 0 {
-                            if self.board.board[move_piece.goal_i][move_piece.goal_j]
-                                == chess::STAR_VALUE
-                            {
-                                play_sound("./sounds/capture.wav");
-                                self.board.num_star_cnt -= 1;
-                            } else {
-                                play_sound("./sounds/move.wav");
-                            }
-                            self.board.update_board(&move_piece);
-                            // let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
-                            // let texture = get_texture(self,ui,img_id);
-                            // Show the image:
-                            // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
-                            if self.board.num_star_cnt == 0 {
-                                play_sound("./sounds/win.wav");
-                            }
-                            self.cur_move_cnt += 1;
-                        }
-                        // validate goali and j so they are within bounds
-                        if !(move_piece.goal_i >= 8 || move_piece.goal_j >= 8) {
-                            let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
-                            if img_id != 0 {
-                                let texture = get_texture(self, ui, img_id);
-                                egui::Image::new(texture, texture.size_vec2())
-                                    .paint_at(ui, piece_rect);
-                            }
-                        }
-                    }
-                    _ => (),
-                }
-
-                ui.vertical_centered_justified(|ui| {
-                    if self.board.num_star_cnt == 0 && self.cur_move_cnt == self.optimal_move_cnt {
-                        self.cur_timed_num_wins += 1;
-                    }
-                    if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
-                        ui.add_space(6.0);
-                        ui.label(
-                            egui::RichText::new("You finished!")
-                                .color(Color32::LIGHT_GREEN)
-                                .size(18.0),
-                        );
-                    }
-
-                    match self.last_timed_game {
-                        None => (),
-                        Some(v) => {
-                            ui.add_space(6.0);
-                            ui.label(
-                                egui::RichText::new(format!("You won {} round(s) in your last timed game", v))
-                                    .color(Color32::LIGHT_GREEN)
-                                    .size(18.0),
+                    if piece_resp.drag_released() {
+                        // done dragging here.. potentially update board state for next frame
+                        assert!(!piece_resp.dragged());
+                        let a = ctx.input().pointer.interact_pos();
+                        if a.is_some() && r.contains(a.unwrap()) {
+                            let a = a.unwrap();
+                            let goal_j = (a.x - r.min.x) / size;
+                            let goal_i = (a.y - r.min.y) / size;
+                            let image_rect = Rect {
+                                min: Pos2 {
+                                    x: (goal_j as i32) as f32 * size + r.min.x,
+                                    y: (goal_i as i32) as f32 * size + r.min.y,
+                                },
+                                max: Pos2 {
+                                    x: (goal_j as i32) as f32 * size + size + r.min.x,
+                                    y: (goal_i as i32) as f32 * size + size + r.min.y,
+                                },
+                            };
+                            piece_state = PieceStates::DragReleased(
+                                image_rect,
+                                MovePiece {
+                                    i: i as usize,
+                                    j: j as usize,
+                                    goal_i: goal_i as usize,
+                                    goal_j: goal_j as usize,
+                                },
                             );
                         }
-                    }
-                });
 
-                
-                //slow mode for debugging
-                // let mut i = i32::MAX;
-                // while i > 0  { i -= 20;}
-                 
+                        ui.painter().rect_filled(sq, 0.0, temp_color);
+                    } else if piece_resp.dragged() {
+                        // println!("{:?} {:?} {:?} {:?} {:?}",r,cur_input_pos, (i,j), sq, piece_resp.rect);
+                        // currently dragging.. draw the texture at current mouse pos
+                        let piece_being_moved = self.board.board[i as usize][j as usize];
+                        if !cur_input_pos.is_none() && piece_being_moved != 0 {
+                            let cur_input_pos = cur_input_pos.unwrap();
+                            // draw at the center of mouse when grabbed
+                            let start_of_rec = Pos2 {
+                                x: cur_input_pos.x - size / 2.0,
+                                y: cur_input_pos.y - size / 2.0,
+                            };
+                            let end_of_rec = Pos2 {
+                                x: start_of_rec.x + size,
+                                y: start_of_rec.y + size,
+                            };
+                            let image_rect = Rect {
+                                min: start_of_rec,
+                                max: end_of_rec,
+                            };
+
+                            piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
+                        }
+                        ui.painter().rect_filled(sq, 0.0, temp_color);
+                    } else if !piece_resp.dragged() && !piece_resp.drag_released() {
+                        ui.painter().rect_filled(sq, 0.0, temp_color);
+                        // paint image
+                        let piece_being_moved = self.board.board[i as usize][j as usize];
+                        if piece_being_moved != 0 {
+                            let texture = get_texture(self, ui, piece_being_moved);
+                            // Show the image:
+                            egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
+                        }
+                    } else {
+                        ui.painter().rect_filled(sq, 0.0, temp_color);
+                    }
+                }
+            }
+
+            // draw the "dragged piece" here
+            match piece_state {
+                PieceStates::Dragged(piece_rect, img_id) => {
+                    let texture = get_texture(self, ui, img_id);
+
+                    // Show the image:
+                    egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                }
+                PieceStates::DragReleased(piece_rect, move_piece) => {
+                    if self.board.validate_move(&move_piece) != 0 {
+                        if self.board.board[move_piece.goal_i][move_piece.goal_j]
+                            == chess::STAR_VALUE
+                        {
+                            play_sound("./sounds/capture.wav");
+                            self.board.num_star_cnt -= 1;
+                        } else {
+                            play_sound("./sounds/move.wav");
+                        }
+                        self.board.update_board(&move_piece);
+                        // let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
+                        // let texture = get_texture(self,ui,img_id);
+                        // Show the image:
+                        // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                        if self.board.num_star_cnt == 0 {
+                            play_sound("./sounds/win.wav");
+                        }
+                        self.cur_move_cnt += 1;
+                    }
+                    // validate goali and j so they are within bounds
+                    if !(move_piece.goal_i >= 8 || move_piece.goal_j >= 8) {
+                        let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
+                        if img_id != 0 {
+                            let texture = get_texture(self, ui, img_id);
+                            egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                        }
+                    }
+                }
+                _ => (),
+            }
+
+            ui.vertical_centered_justified(|ui| {
+                if self.board.num_star_cnt == 0 && self.cur_move_cnt == self.optimal_move_cnt {
+                    self.cur_timed_num_wins += 1;
+                }
+                if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
+                    ui.add_space(10.0);
+                    ui.label(
+                        egui::RichText::new("You finished!")
+                            .color(Color32::LIGHT_GREEN)
+                            .size(22.0),
+                    );
+                }
+
+                match self.last_timed_game {
+                    None => (),
+                    Some(v) => {
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "You won {} round(s) in your last timed game",
+                                v
+                            ))
+                            .color(Color32::LIGHT_GREEN)
+                            .size(22.0),
+                        );
+                    }
+                }
             });
+
+            //slow mode for debugging
+            // let mut i = i32::MAX;
+            // while i > 0  { i -= 20;}
+        });
 
         // Resize the native window to be just the size we need it to be:
         // frame.set_window_size(ctx.used_size());
