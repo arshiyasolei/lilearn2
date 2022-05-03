@@ -117,9 +117,21 @@ jobs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: ${{ matrix.target }}
+        override: true
+
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --target ${{ matrix.target }}
+        use-cross: false
+
     - name: Build
       run: | 
-        cargo build --release
         zip -r lilearn_${{ matrix.target }}.zip ./sounds ./images target/${{ matrix.target }}/release/lilearn*
     - name: Release
       uses: softprops/action-gh-release@v1
