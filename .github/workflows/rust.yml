@@ -95,5 +95,38 @@ jobs:
         tag_name: beta
         generate_release_notes: true
 
+  mac_build:
+
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+    steps:
+    - uses: actions/checkout@v3
+      with: 
+        submodules: 'recursive'
+    - name: Cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Build
+      run: | 
+        cargo build --release
+        zip -r lilearn_${{ matrix.target }}.zip ./sounds ./images target/${{ matrix.target }}/release/lilearn*
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: lilearn_${{ matrix.target }}.zip
+        body: Lilearn release! 
+        tag_name: beta
+        generate_release_notes: true
 
 
