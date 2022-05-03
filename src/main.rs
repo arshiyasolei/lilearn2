@@ -66,8 +66,8 @@ impl Default for MyApp {
             cur_move_cnt: 0,
             choice_piece: QUEEN_WHITE,
             star_cnt: 5,
-            board_light_sq_color: Color32::LIGHT_RED,
-            board_dark_sq_color: Color32::DARK_BLUE,
+            board_light_sq_color: Color32::WHITE,
+            board_dark_sq_color: Color32::BLACK,
             auto_play: false,
             window_bg_color: Color32::BLACK,
             // timers
@@ -155,7 +155,7 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
         .get_or_insert_with(|| {
             let mut img;
             let mut name;
-            if img_id == 99 {
+            if img_id == chess::STAR_VALUE {
                 // load star
                 img = load_image_from_path(Path::new("./images/star.png")).unwrap();
                 name = "star_img";
@@ -177,6 +177,9 @@ impl eframe::App for MyApp {
         visuals.window_shadow = egui::epaint::Shadow::small_dark();
         visuals.widgets.noninteractive.bg_stroke.width = 0.0;
         ctx.tessellation_options().feathering_size_in_pixels = 0.3;
+        let mut style: egui::Style = (*ctx.style()).clone();
+        style.spacing.indent = 11.0;
+        ctx.set_style(style);
         ctx.set_visuals(visuals.clone());
         // TODO add new fonts
         egui::containers::SidePanel::left("Controls")
@@ -192,6 +195,11 @@ impl eframe::App for MyApp {
                     ui.heading("LiLearn");
                 });
                 ui.add_space(5.0);
+
+                ui.collapsing("How to play", |ui| {
+                    ui.monospace("Try to collect all the stars with as few moves as possible! There's also a timed mode if you are up for the challenge!");
+                    ui.add_space(2.0);
+                });
                 /*
                 center with ui.columns..
                 */
@@ -267,7 +275,7 @@ impl eframe::App for MyApp {
             });
 
         // set window colors
-        visuals.override_text_color = Some(Color32::from_gray(240));
+        visuals.override_text_color = Some(Color32::from_gray(255));
         visuals.widgets.noninteractive.bg_fill = Color32::BLACK;
         ctx.set_visuals(visuals);
         
@@ -438,11 +446,12 @@ impl eframe::App for MyApp {
                     self.cur_timed_num_wins += 1;
                 }
                 if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
-                    ui.add_space(10.0);
+                    ui.add_space(15.0);
                     ui.label(
                         egui::RichText::new("You finished!")
                             .color(Color32::LIGHT_GREEN)
-                            .size(22.0),
+                            .size(25.0)
+                            .monospace(),
                     );
                 }
 
@@ -456,13 +465,14 @@ impl eframe::App for MyApp {
                                 v
                             ))
                             .color(Color32::LIGHT_GREEN)
-                            .size(22.0),
+                            .size(25.0)
+                            .monospace(),
                         );
                     }
                 }
             });
 
-            //slow mode for debugging
+            // slow mode for debugging
             // let mut i = i8::MAX;
             // while i > 0  { i -= 20;}
         });
