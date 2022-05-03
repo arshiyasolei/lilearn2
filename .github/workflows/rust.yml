@@ -10,10 +10,64 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  linux_build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: install linux deps
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends libasound2-dev pkg-config tree
+          sudo apt install zip
+          sudo apt install libasound2 alsa-utils alsa-oss
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+          use-cross: false
+
+      - run: | 
+          tree target/ # to find release files
+          zip -r lilearn_${{ matrix.target }}.zip ./sounds ./images target/${{ matrix.target }}/release/lilearn*
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: Lilearn release!
+          tag_name: beta
+          generate_release_notes: true
+          files: |
+            lilearn_${{ matrix.target }}.zip
+
+  windows_build:
 
     runs-on: windows-latest
-
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
     steps:
     - uses: actions/checkout@v3
       with: 
@@ -31,11 +85,11 @@ jobs:
     - name: Build
       run: | 
         cargo build --release
-        Compress-Archive -Path .\target\release\lilearn.exe , .\sounds, .\images  -CompressionLevel Optimal -DestinationPath lilearn.zip
+        Compress-Archive -Path .\target\release\lilearn.exe , .\sounds, .\images  -CompressionLevel Optimal -DestinationPath lilearn_${{ matrix.target }}.zip
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: lilearn.zip
+        files: lilearn_${{ matrix.target }}.zip
         body: Lilearn release! 
         tag_name: beta
         generate_release_notes: true
