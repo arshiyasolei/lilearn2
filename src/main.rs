@@ -355,7 +355,7 @@ impl eframe::App for MyApp {
                     let piece_resp = ui.allocate_rect(sq, Sense::drag());
 
                     let cur_input_pos = ctx.input().pointer.interact_pos();
-
+                    let piece_being_moved = self.board.board[i as usize][j as usize];
                     if piece_resp.drag_released() {
                         // done dragging here.. potentially update board state for next frame
                         assert!(!piece_resp.dragged());
@@ -386,10 +386,8 @@ impl eframe::App for MyApp {
                         }
 
                         ui.painter().rect_filled(sq, 0.0, temp_color);
-                    } else if piece_resp.dragged() {
-                        // println!("{:?} {:?} {:?} {:?} {:?}",r,cur_input_pos, (i,j), sq, piece_resp.rect);
+                    } else if piece_resp.dragged() && piece_being_moved != chess::STAR_VALUE {
                         // currently dragging.. draw the texture at current mouse pos
-                        let piece_being_moved = self.board.board[i as usize][j as usize];
                         if !cur_input_pos.is_none() && piece_being_moved != 0 {
                             let cur_input_pos = cur_input_pos.unwrap();
                             // draw at the center of mouse when grabbed
@@ -409,10 +407,9 @@ impl eframe::App for MyApp {
                             piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
                         }
                         ui.painter().rect_filled(sq, 0.0, temp_color);
-                    } else if !piece_resp.dragged() && !piece_resp.drag_released() {
+                    } else if (!piece_resp.dragged() && !piece_resp.drag_released()) || piece_being_moved == chess::STAR_VALUE {
                         ui.painter().rect_filled(sq, 0.0, temp_color);
                         // paint image
-                        let piece_being_moved = self.board.board[i as usize][j as usize];
                         if piece_being_moved != 0 {
                             let texture = get_texture(self, ui, piece_being_moved);
                             // Show the image:
