@@ -214,20 +214,25 @@ impl eframe::App for MyApp {
                     ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
                 });
 
-                // pick board colors
-                ui.horizontal(|ui| {
+                egui::Grid::new("my_grid")
+                .num_columns(2)
+                .spacing([23.0, 4.0])
+                .show(ui, |ui| {
+                    // pick board colors
+
                     ui.label("Dark square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
-                });
-                ui.horizontal(|ui| {
+                    ui.end_row();
+
                     ui.label("Light square color picker: ");
                     ui.color_edit_button_srgba(&mut self.board_light_sq_color);
-                });
-                ui.horizontal(|ui| {
+                    ui.end_row();
+
                     ui.label("Window background color picker: ");
                     ui.color_edit_button_srgba(&mut self.window_bg_color);
-                });
+                    ui.end_row();
 
+                });
                 ui.horizontal(|ui| {
                     if !self.timed {
                         ui.checkbox(&mut self.auto_play, "Auto play");
@@ -254,11 +259,14 @@ impl eframe::App for MyApp {
                     if ui.add(new_round_btn).clicked() {
                         self.last_timed_game = None;
                         self.cur_timed_num_wins = 0;
-
+                        
                         if self.timed {
                             self.auto_play = true;
                             self.in_timed_round = true;
                             self.timer = self.starting_timer;
+                        } else {
+                            self.timed = false;
+                            self.in_timed_round = false;
                         }
 
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
