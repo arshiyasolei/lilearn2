@@ -217,11 +217,11 @@ impl eframe::App for MyApp {
                 // pick board colors
                 ui.horizontal(|ui| {
                     ui.label("Dark square color picker: ");
-                    ui.color_edit_button_srgba(&mut self.board_light_sq_color);
+                    ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
                 });
                 ui.horizontal(|ui| {
                     ui.label("Light square color picker: ");
-                    ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
+                    ui.color_edit_button_srgba(&mut self.board_light_sq_color);
                 });
                 ui.horizontal(|ui| {
                     ui.label("Window background color picker: ");
