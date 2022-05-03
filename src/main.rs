@@ -9,6 +9,7 @@ use eframe::{
 };
 use std::{collections::HashMap, hash::Hash, ptr::NonNull};
 use std::{path::Path, thread};
+use std::time::{SystemTime, UNIX_EPOCH};
 fn main() {
     let options = eframe::NativeOptions {
         // Let's show off that we support transparent windows
@@ -42,8 +43,8 @@ struct MyApp {
     auto_play: bool,
     // timer things
     timed: bool, // see how many rounds you can complete in X minutes
-    starting_timer: i32,
-    timer: i32, // using frames as ref
+    starting_timer: u64,
+    timer: u64, // using frames as ref
     in_timed_round: bool,
     cur_timed_num_wins: i32,
     last_timed_game: Option<i32>,
@@ -197,7 +198,7 @@ impl eframe::App for MyApp {
                 ui.add_space(5.0);
 
                 ui.collapsing("How to play", |ui| {
-                    ui.monospace("Try to collect all the stars with as few moves as possible! There's also a timed mode if you are up for the challenge!");
+                    ui.monospace("Try to collect all the stars with as few moves as possible! There's also a timed mode if you are up for the challenge! The timer is set in seconds.");
                     ui.add_space(2.0);
                 });
                 /*
@@ -242,16 +243,18 @@ impl eframe::App for MyApp {
 
                 ui.add_space(2.0);
                 ui.vertical_centered_justified(|ui| {
-                    ui.menu_button("Timer", |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Set timer: ");
-                            ui.add(egui::Slider::new(&mut self.starting_timer, 1..=20000));
-                        });
+                    if !self.in_timed_round {
+                        ui.menu_button("Timer", |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("Set timer: ");
+                                ui.add(egui::Slider::new(&mut self.starting_timer, 1..=500));
+                            });
 
-                        if ui.button("Close").clicked() {
-                            ui.close_menu();
-                        }
-                    });
+                            if ui.button("Close").clicked() {
+                                ui.close_menu();
+                            }
+                        });
+                    }
 
                     ui.add_space(2.0);
                     let new_round_btn = egui::Button::new("New round");
@@ -263,7 +266,11 @@ impl eframe::App for MyApp {
                         if self.timed {
                             self.auto_play = true;
                             self.in_timed_round = true;
-                            self.timer = self.starting_timer;
+                            let start = SystemTime::now();
+                            let since_the_epoch = start
+                                .duration_since(UNIX_EPOCH)
+                                .expect("Time went backwards");
+                            self.timer = since_the_epoch.as_secs()
                         } else {
                             self.timed = false;
                             self.in_timed_round = false;
@@ -294,17 +301,25 @@ impl eframe::App for MyApp {
         })    
         .show(ctx, |ui| {
             if self.in_timed_round {
-                if self.timer == 0 {
+                // get cur time and compare
+                let cur_time = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards");
+                if self.timer + self.starting_timer <= cur_time.as_secs() {
                     self.in_timed_round = false;
                     self.last_timed_game = Some(self.cur_timed_num_wins);
                     self.cur_timed_num_wins = 0;
                     self.cur_move_cnt = 0;
-                    self.timer = self.starting_timer;
+                    let start = SystemTime::now();
+                    let since_the_epoch = start
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards");
+                    self.timer = since_the_epoch.as_secs();
                     // restart and create a new game
                     self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 } else {
-                    ui.label("Time left: ".to_owned() + &self.timer.to_string());
+                    ui.label(format!("Time left: {}",self.starting_timer - (cur_time.as_secs() - self.timer)));
                 }
             }
             ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
@@ -488,8 +503,6 @@ impl eframe::App for MyApp {
         // Resize the native window to be just the size we need it to be:
         // frame.set_window_size(ctx.used_size());
         if self.in_timed_round {
-            // reduce timer every frame and get every frame
-            self.timer -= 1;
             ctx.request_repaint();
         }
     }
