@@ -30,12 +30,12 @@ fn main() {
 // store main app state here?...
 // egui has dragging implemented already !
 struct MyApp {
-    textures: HashMap<i32, Option<egui::TextureHandle>>, // piece -> texture mapping
+    textures: HashMap<i8, Option<egui::TextureHandle>>, // piece -> texture mapping
     board: LiBoard,
-    cur_move_cnt: i32,
-    optimal_move_cnt: i32,
-    choice_piece: i32,
-    star_cnt: i32,
+    cur_move_cnt: i8,
+    optimal_move_cnt: i8,
+    choice_piece: i8,
+    star_cnt: i8,
     board_light_sq_color: Color32,
     board_dark_sq_color: Color32,
     window_bg_color: Color32,
@@ -50,7 +50,7 @@ struct MyApp {
 }
 
 enum PieceStates {
-    Dragged(Rect, i32),            // where to draw image and what image to draw
+    Dragged(Rect, i8),            // where to draw image and what image to draw
     DragReleased(Rect, MovePiece), // draw the image just before releasing
     NoDrag,
 }
@@ -142,7 +142,7 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
     ))
 }
 
-fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i32) -> &'a TextureHandle {
+fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
     // where to draw currently dragged image
     // insert id if it isn't there
     if !app.textures.contains_key(&img_id) {
@@ -253,13 +253,13 @@ impl eframe::App for MyApp {
                             self.timer = self.starting_timer;
                         }
 
-                        self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                        self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                     }
 
                     if self.auto_play && self.board.num_star_cnt == 0 {
-                        self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                        self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                     }
@@ -285,7 +285,7 @@ impl eframe::App for MyApp {
                     self.cur_move_cnt = 0;
                     self.timer = self.starting_timer;
                     // restart and create a new game
-                    self.board = LiBoard::new(self.star_cnt as u8, self.choice_piece);
+                    self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 } else {
                     ui.label("Time left: ".to_owned() + &self.timer.to_string());
@@ -335,12 +335,12 @@ impl eframe::App for MyApp {
                             let goal_i = (a.y - r.min.y) / size;
                             let image_rect = Rect {
                                 min: Pos2 {
-                                    x: (goal_j as i32) as f32 * size + r.min.x,
-                                    y: (goal_i as i32) as f32 * size + r.min.y,
+                                    x: (goal_j as i8) as f32 * size + r.min.x,
+                                    y: (goal_i as i8) as f32 * size + r.min.y,
                                 },
                                 max: Pos2 {
-                                    x: (goal_j as i32) as f32 * size + size + r.min.x,
-                                    y: (goal_i as i32) as f32 * size + size + r.min.y,
+                                    x: (goal_j as i8) as f32 * size + size + r.min.x,
+                                    y: (goal_i as i8) as f32 * size + size + r.min.y,
                                 },
                             };
                             piece_state = PieceStates::DragReleased(
@@ -463,7 +463,7 @@ impl eframe::App for MyApp {
             });
 
             //slow mode for debugging
-            // let mut i = i32::MAX;
+            // let mut i = i8::MAX;
             // while i > 0  { i -= 20;}
         });
 
