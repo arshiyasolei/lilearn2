@@ -35,6 +35,12 @@ jobs:
           sudo apt install -y --no-install-recommends libasound2-dev pkg-config tree
           sudo apt install zip
 
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -43,7 +49,7 @@ jobs:
 
       - run: | 
           tree target/ # to find release files
-          zip -r lilearn.zip ./sounds ./images target/x86_64-pc-windows-gnu/release/lilearn.exe target/x86_64-unknown-linux-gnu/release/lilearn target/aarch64-apple-darwin/release/lilearn target/x86_64-apple-darwin/release/lilearn
+          zip -r lilearn_${{ matrix.target }}.zip ./sounds ./images target/${{ matrix.target }}/release/lilearn*
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -52,4 +58,4 @@ jobs:
           tag_name: beta
           generate_release_notes: true
           files: |
-            lilearn.zip
+            lilearn_${{ matrix.target }}.zip
