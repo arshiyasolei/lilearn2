@@ -66,7 +66,7 @@ impl Default for MyApp {
     }
 }
 
-// piece PATHS (legacy code)
+// piece PATHS
 static IMAGES: [&[u8]; 15] = [
     include_bytes!("../images/star.png").as_slice(),
     include_bytes!("../images/black_pawn.png").as_slice(),
@@ -281,6 +281,7 @@ impl eframe::App for MyApp {
         egui::containers::CentralPanel::default()
         .frame(egui::containers::Frame {
             outer_margin: egui::style::Margin::from(25.0),
+            fill: self.window_bg_color,
             ..Default::default()
         })    
         .show(ctx, |ui| {
