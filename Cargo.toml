@@ -1,8 +1,16 @@
 [package]
 name = "lilearn"
+default-run = "desktop_bin"
 version = "0.1.0"
 edition = "2021"
 authors = ["Arshia S"]
+
+[[bin]]
+name = "desktop_bin"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 rodio = { version = "0.15.0", default-features = false, features = ["wav"] }
@@ -10,3 +18,14 @@ rand = "0.8.5"
 image = "0.24.1"
 eframe = { path = "./egui/eframe" }
 
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.6"
+tracing-wasm = "0.2"
+
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+
+[patch.crates-io]
