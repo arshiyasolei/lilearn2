@@ -1,12 +1,12 @@
 [package]
 name = "lilearn"
-default-run = "desktop_bin"
+default-run = "lilearn"
 version = "0.1.0"
 edition = "2021"
 authors = ["Arshia S"]
 
 [[bin]]
-name = "desktop_bin"
+name = "lilearn"
 path = "src/main.rs"
 
 [lib]
