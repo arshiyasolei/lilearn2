@@ -280,7 +280,7 @@ impl eframe::App for MyApp {
         
         egui::containers::CentralPanel::default()
         .frame(egui::containers::Frame {
-            outer_margin: egui::style::Margin::from(25.0),
+            inner_margin: egui::style::Margin::from(25.0),
             fill: self.window_bg_color,
             ..Default::default()
         })    
