@@ -31,12 +31,12 @@ fn main() {
     );
 }
 
-fn load_icon() -> Result< eframe::epi::IconData , image::ImageError>{
+fn load_icon() -> Result< eframe::IconData , image::ImageError>{
     let image = image::io::Reader::open(Path::new("./images/icon.png"))?.decode()?;
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
-    Ok(eframe::epi::IconData {
+    Ok(eframe::IconData {
         rgba: image_buffer.to_vec(),
         width: size[0],
         height: size[1]

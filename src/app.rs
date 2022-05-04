@@ -104,12 +104,12 @@ fn play_sound(path_to_file: &'static str) {
     });
 }
 
-fn load_icon() -> Result< eframe::epi::IconData , image::ImageError>{
+fn load_icon() -> Result< eframe::IconData , image::ImageError>{
     let image = image::io::Reader::open(Path::new("./images/icon.png"))?.decode()?;
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
-    Ok(eframe::epi::IconData {
+    Ok(eframe::IconData {
         rgba: image_buffer.to_vec(),
         width: size[0],
         height: size[1]
@@ -493,7 +493,7 @@ impl eframe::App for MyApp {
         ctx.request_repaint();
     }
 
-    fn clear_color(&self) -> egui::Rgba {
+    fn clear_color(&self,_visuals: &egui::Visuals) -> egui::Rgba {
         // sets window bg color
         self.window_bg_color.into()
     }
