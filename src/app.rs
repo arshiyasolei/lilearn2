@@ -4,7 +4,7 @@
 mod chess;
 use chess::{LiBoard, MovePiece, QUEEN_WHITE};
 use eframe::{
-    egui::{self, CollapsingHeader, Sense, Ui},
+    egui::{self, CollapsingHeader, Sense, Ui, TextBuffer},
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
@@ -66,34 +66,55 @@ impl Default for MyApp {
     }
 }
 
-// piece PATHS
-static IMAGES: [&[u8]; 15] = [
+// piece IMAGES
+static IMAGES: [&[u8]; 5] = [
     include_bytes!("../images/star.png").as_slice(),
-    include_bytes!("../images/black_pawn.png").as_slice(),
-    include_bytes!("../images/white_pawn.png").as_slice(),
-    include_bytes!("../images/black_bishop.png").as_slice(),
-    include_bytes!("../images/black_knight.png").as_slice(),
-    include_bytes!("../images/black_rook.png").as_slice(),
-    include_bytes!("../images/black_queen.png").as_slice(),
-    include_bytes!("../images/black_king.png").as_slice(),
-    include_bytes!("../images/black_king.png").as_slice(),
-    include_bytes!("../images/black_king.png").as_slice(),
+    include_bytes!("../images/icon.png").as_slice(),
     include_bytes!("../images/white_rook.png").as_slice(),
     include_bytes!("../images/white_knight.png").as_slice(),
-    include_bytes!("../images/white_bishop.png").as_slice(),
     include_bytes!("../images/white_queen.png").as_slice(),
-    include_bytes!("../images/white_king.png").as_slice(),
 ];
 
-fn play_sound(path_to_file: &'static str) {
+// piece AUDIO  
+static AUDIO: [&[u8]; 3] = [
+    include_bytes!("../sounds/move.wav").as_slice(),
+    include_bytes!("../sounds/win.wav").as_slice(),
+    include_bytes!("../sounds/capture.wav").as_slice(),
+];
+
+fn img_id_map(i: i8) -> usize {
+    match i {
+        chess::QUEEN_WHITE => 4,
+        chess::KNIGHT_WHITE => 3,
+        chess::ROOK_WHITE => 2,
+        _ => panic!("invalid Image request")
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn now_sec() -> u64 {
+    (eframe::web_sys::window()
+        .expect("should have a Window")
+        .performance()
+        .expect("should have a Performance")
+        .now()
+        / 1000.0) as u64
+}
+
+fn play_sound(name: &'static str) {
     thread::spawn(move || {
         use rodio::{source::Source, Decoder, OutputStream};
-        use std::fs::File;
-        use std::io::BufReader;
+        use std::io::{Cursor};
+        let sample = match name.as_str() {
+            "move" => AUDIO[0],
+            "win" => AUDIO[1],
+            "capture" => AUDIO[2],
+            _ => panic!("wrong type of sound?")
+        };
         // Get a output stream handle to the default physical sound device
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-        // Load a sound from a file, using a path relative to Cargo.toml
-        let file = BufReader::new(File::open(path_to_file).unwrap());
+        // using cursor to load it in memory
+        let file = Cursor::new(sample);
         // Decode that sound file into a source
         let source = Decoder::new(file).unwrap();
         // Play the sound directly on the device
@@ -104,8 +125,8 @@ fn play_sound(path_to_file: &'static str) {
     });
 }
 
-fn load_icon() -> Result< eframe::IconData , image::ImageError>{
-    let image = image::io::Reader::open(Path::new("./images/icon.png"))?.decode()?;
+pub fn load_icon() -> Result< eframe::IconData , image::ImageError>{
+    let image = image::load_from_memory_with_format(IMAGES[1], image::ImageFormat::Png).unwrap();
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
@@ -145,7 +166,7 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
                 img = load_image(IMAGES[0].clone()).unwrap();
                 name = "star_img";
             } else {
-                img = load_image(IMAGES[img_id as usize].clone()).unwrap();
+                img = load_image(IMAGES[img_id_map(img_id)].clone()).unwrap();
                 name = "others"; // TODO fix
             }
 
@@ -185,20 +206,19 @@ impl eframe::App for MyApp {
                     ui.monospace("Try to collect all the stars with as few moves as possible! There's also a timed mode if you are up for the challenge! The timer is set in seconds.");
                     ui.add_space(2.0);
                 });
-                /*
-                center with ui.columns..
-                */
-                ui.horizontal(|ui| {
-                    ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
-                    ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
-                    ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
-                });
+                
+                if !self.in_timed_round {
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
+                        ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
+                        ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
+                    });
 
-                ui.horizontal(|ui| {
-                    ui.label("Number of stars: ");
-                    ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
-                });
-
+                    ui.horizontal(|ui| {
+                        ui.label("Number of stars: ");
+                        ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
+                    }); 
+                }
                 egui::Grid::new("my_grid")
                 .num_columns(2)
                 .spacing([23.0, 4.0])
@@ -250,11 +270,16 @@ impl eframe::App for MyApp {
                         if self.timed {
                             self.auto_play = true;
                             self.in_timed_round = true;
-                            let start = SystemTime::now();
-                            let since_the_epoch = start
+                            #[cfg(not(target_arch = "wasm32"))]
+                            let cur_time = SystemTime::now()
                                 .duration_since(UNIX_EPOCH)
-                                .expect("Time went backwards");
-                            self.timer = since_the_epoch.as_secs()
+                                .expect("Time went backwards")
+                                .as_secs();
+                            
+                            #[cfg(target_arch = "wasm32")]
+                            let cur_time =  now_sec();
+
+                            self.timer = cur_time;
                         } else {
                             self.timed = false;
                             self.in_timed_round = false;
@@ -287,24 +312,26 @@ impl eframe::App for MyApp {
         .show(ctx, |ui| {
             if self.in_timed_round {
                 // get cur time and compare
+                #[cfg(not(target_arch = "wasm32"))]
                 let cur_time = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards");
-                if self.timer + self.starting_timer <= cur_time.as_secs() {
+                    .expect("Time went backwards")
+                    .as_secs();
+                
+                #[cfg(target_arch = "wasm32")]
+                let cur_time =  now_sec();
+                
+                if self.timer + self.starting_timer <= cur_time {
                     self.in_timed_round = false;
                     self.last_timed_game = Some(self.cur_timed_num_wins);
                     self.cur_timed_num_wins = 0;
                     self.cur_move_cnt = 0;
-                    let start = SystemTime::now();
-                    let since_the_epoch = start
-                        .duration_since(UNIX_EPOCH)
-                        .expect("Time went backwards");
-                    self.timer = since_the_epoch.as_secs();
+                    self.timer = cur_time;
                     // restart and create a new game
                     self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 } else {
-                    ui.label(format!("Time left: {}",self.starting_timer - (cur_time.as_secs() - self.timer)));
+                    ui.label(format!("Time left: {}",self.starting_timer - (cur_time - self.timer)));
                 }
             }
             ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
@@ -420,11 +447,11 @@ impl eframe::App for MyApp {
                             == chess::STAR_VALUE
                         {
                             #[cfg(target_arch = "x86_64")]
-                            play_sound("./sounds/capture.wav");
+                            play_sound("capture");
                             self.board.num_star_cnt -= 1;
                         } else {
                             #[cfg(target_arch = "x86_64")]
-                            play_sound("./sounds/move.wav");
+                            play_sound("move");
                         }
                         self.board.update_board(&move_piece);
                         // let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
@@ -433,7 +460,7 @@ impl eframe::App for MyApp {
                         // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                         if self.board.num_star_cnt == 0 {
                             #[cfg(target_arch = "x86_64")]
-                            play_sound("./sounds/win.wav");
+                            play_sound("win");
                         }
                         self.cur_move_cnt += 1;
                     }
@@ -490,8 +517,6 @@ impl eframe::App for MyApp {
         if self.in_timed_round {
             ctx.request_repaint();
         }
-        #[cfg(target_arch = "wasm32")]
-        ctx.request_repaint();
     }
 
     fn clear_color(&self,_visuals: &egui::Visuals) -> egui::Rgba {

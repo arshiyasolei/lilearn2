@@ -51,7 +51,6 @@ jobs:
 
       - run: | 
           tree target/ # to find release files
-          zip lilearn_${{ matrix.target }}.zip -r ./sounds ./images 
           zip lilearn_${{ matrix.target }}.zip -r -j target/${{ matrix.target }}/release/lilearn*
 
       - name: Release
@@ -87,7 +86,7 @@ jobs:
     - name: Build
       run: | 
         cargo build --release
-        Compress-Archive -Path .\target\release\lilearn.exe , .\sounds, .\images  -CompressionLevel Optimal -DestinationPath lilearn_${{ matrix.target }}.zip
+        Compress-Archive -Path .\target\release\lilearn.exe  -CompressionLevel Optimal -DestinationPath lilearn_${{ matrix.target }}.zip
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
@@ -133,7 +132,6 @@ jobs:
 
     - name: Build
       run: | 
-        zip lilearn_${{ matrix.target }}.zip -r ./sounds ./images 
         zip lilearn_${{ matrix.target }}.zip -r -j target/${{ matrix.target }}/release/lilearn*
     - name: Release
       uses: softprops/action-gh-release@v1
