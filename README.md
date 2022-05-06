@@ -1,12 +1,17 @@
 # LiLearn v2
 
-to run:
+![img](./demo.PNG)
 
+Try the [web version](https://arshiyasolei.github.io/lilearn2/) or get the [binaries!](https://github.com/arshiyasolei/lilearn2/releases) 
+
+requires a [rust installation.](https://www.rust-lang.org/tools/install) 
+
+to run from source:
 ```
 cargo run
 ```
 
-to run for web: (using WSL or any *nix)
+for web: (using WSL or any *nix)
 ```
 ./setup_web.sh
 ./build_web.sh
