@@ -284,11 +284,17 @@ impl<'a> eframe::App for MyApp<'a> {
 
 
                 // show win msgs
-                if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
+                if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play && !self.in_game {
+                    let mut msg = "You were close!";
+                    let mut msg_color = Color32::DARK_GREEN;
+                    if self.cur_move_cnt == self.optimal_move_cnt {
+                        msg = "Excellent! 🔥🔥🔥";
+                        msg_color = Color32::from_rgb(91, 33, 50)
+                    }
                     ui.add_space(15.0);
                     ui.label(
-                        egui::RichText::new("You finished!")
-                            .color(Color32::DARK_GREEN)
+                        egui::RichText::new(msg)
+                            .color(msg_color)
                             .size(18.0)
                             .monospace(),
                     );
@@ -571,8 +577,10 @@ impl<'a> eframe::App for MyApp<'a> {
                         // let texture = get_texture(self,ui,img_id);
                         // Show the image:
                         // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
-                        self.cur_move_cnt += 1;
-                        if self.board.num_star_cnt == 0 {
+                        if self.in_game {
+                            self.cur_move_cnt += 1;
+                        }
+                        if self.board.num_star_cnt == 0 && self.in_game {
                             #[cfg(target_arch = "x86_64")]
                             play_sound("win");
                         }
