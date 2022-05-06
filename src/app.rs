@@ -8,14 +8,18 @@ use eframe::{
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
-use std::{collections::HashMap, hash::Hash, ptr::NonNull};
+use std::{collections::HashMap, hash::Hash, ptr::NonNull, slice::from_mut};
 use std::{path::Path, thread};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // store main app state here?...
 // egui has dragging implemented already !
-pub struct MyApp {
+pub struct MyApp<'a> {
+    // pictures and animations
     textures: HashMap<i8, Option<egui::TextureHandle>>, // piece -> texture mapping
+    animation_textures: HashMap<&'a str, Option<Vec<egui::TextureHandle>>>,
+    current_animations: HashMap<&'a str, Vec<egui::TextureHandle>>,
+    // game state
     board: LiBoard,
     cur_move_cnt: i8,
     optimal_move_cnt: i8,
@@ -25,6 +29,7 @@ pub struct MyApp {
     board_dark_sq_color: Color32,
     window_bg_color: Color32,
     auto_play: bool,
+    in_game: bool,
     // timer things
     timed: bool, // see how many rounds you can complete in X minutes
     starting_timer: u64,
@@ -32,6 +37,9 @@ pub struct MyApp {
     in_timed_round: bool,
     cur_timed_num_wins: i32,
     last_timed_game: Option<i32>,
+    // stats
+    points: u64,
+    streak: u64
 }
 
 enum PieceStates {
@@ -40,12 +48,14 @@ enum PieceStates {
     NoDrag,
 }
 
-impl Default for MyApp {
+impl Default for MyApp<'_> {
     fn default() -> Self {
         let b = chess::LiBoard::new(5, chess::QUEEN_WHITE);
         let opt_cnt = b.num_optimal_moves_to_star();
         Self {
             textures: HashMap::new(),
+            animation_textures: HashMap::new(),
+            current_animations: HashMap::new(),
             board: b,
             optimal_move_cnt: opt_cnt,
             cur_move_cnt: 0,
@@ -62,17 +72,21 @@ impl Default for MyApp {
             cur_timed_num_wins: 0,
             last_timed_game: None,
             starting_timer: 2000,
+            streak: 0,
+            points: 0,
+            in_game: true
         }
     }
 }
 
 // piece IMAGES
-static IMAGES: [&[u8]; 5] = [
+static IMAGES: [&[u8]; 6] = [
     include_bytes!("../images/star.png").as_slice(),
     include_bytes!("../images/icon.png").as_slice(),
     include_bytes!("../images/white_rook.png").as_slice(),
     include_bytes!("../images/white_knight.png").as_slice(),
     include_bytes!("../images/white_queen.png").as_slice(),
+    include_bytes!("../images/fire.png").as_slice(),
 ];
 
 // piece AUDIO  
@@ -80,6 +94,11 @@ static AUDIO: [&[u8]; 3] = [
     include_bytes!("../sounds/move.wav").as_slice(),
     include_bytes!("../sounds/win.wav").as_slice(),
     include_bytes!("../sounds/capture.wav").as_slice(),
+];
+
+// piece GIFs  
+static GIFS: [&[u8]; 1] = [
+    include_bytes!("../images/confetti.gif").as_slice(),
 ];
 
 fn img_id_map(i: i8) -> usize {
@@ -148,6 +167,47 @@ pub fn load_image(img: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
     ))
 }
 
+// for animations
+pub fn load_frames(gif: &[u8]) ->  Vec<egui::ColorImage> {
+    use image::codecs::gif::{GifDecoder, GifEncoder};
+    use image::{ImageDecoder, AnimationDecoder};
+    use std::io::{Cursor};
+    let file = Cursor::new(gif);
+    let decoder = GifDecoder::new(file).unwrap();
+    let frames = decoder.into_frames();
+    let frames = frames.collect_frames().expect("error decoding gif");
+    let mut res = Vec::new();
+    for elm in frames {
+        let size = [elm.buffer().width() as _, elm.buffer().height() as _];
+        let img_buf = elm.into_buffer();
+        res.push(egui::ColorImage::from_rgba_unmultiplied(size, img_buf.as_flat_samples().as_slice()))
+    }
+    res
+}
+
+fn get_animation_textures<'a>(app: &'a mut MyApp, ui: &'a mut Ui,name: &'static str) -> &'a Vec<TextureHandle> {
+
+    // where to draw currently dragged image
+    // insert id if it isn't there
+    if !app.animation_textures.contains_key(&name) {
+        app.animation_textures.insert(name, None);
+    }
+
+    app.animation_textures
+        .get_mut(&name)
+        .unwrap()
+        .get_or_insert_with(|| {
+            let frames = load_frames(GIFS[0]);
+            let mut handles: Vec<TextureHandle> = Vec::new();
+            for img in frames {
+                handles.push(ui.ctx().load_texture(name, img));
+            }
+            handles
+        });
+
+    app.animation_textures[&name].as_ref().unwrap()
+}
+
 fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
     // where to draw currently dragged image
     // insert id if it isn't there
@@ -165,18 +225,22 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
                 // load star
                 img = load_image(IMAGES[0].clone()).unwrap();
                 name = "star_img";
-            } else {
+            } else if img_id == 24 {
+                // TODO remove magic nums
+                img = load_image(IMAGES[5].clone()).unwrap();
+                name = "fire";
+            }
+            else {
                 img = load_image(IMAGES[img_id_map(img_id)].clone()).unwrap();
                 name = "others"; // TODO fix
             }
-
             ui.ctx().load_texture(name, img)
         });
 
     app.textures[&img_id].as_ref().unwrap()
 }
 
-impl eframe::App for MyApp {
+impl<'a> eframe::App for MyApp<'a> {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // Controls styles
         let mut visuals = egui::Visuals::light();
@@ -196,10 +260,56 @@ impl eframe::App for MyApp {
                 ..Default::default()
             })
             .show(ctx, |ui| {
+                // setup animation textures
+                get_animation_textures(self,ui,"confetti");
+
                 ui.add_space(5.0);
                 ui.vertical_centered_justified(|ui| {
                     ui.heading("LiLearn");
                 });
+                ui.add_space(25.0);
+
+
+                ui.label(egui::RichText::new(format!("Points: {}",self.points))
+                    .color(Color32::BLACK)
+                    .size(18.0)
+                    .monospace(),);
+
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(format!("🔥: {}",self.streak))
+                    .color(Color32::RED)
+                    .size(18.0)
+                    .monospace(),);
+                });
+
+
+                // show win msgs
+                if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
+                    ui.add_space(15.0);
+                    ui.label(
+                        egui::RichText::new("You finished!")
+                            .color(Color32::DARK_GREEN)
+                            .size(18.0)
+                            .monospace(),
+                    );
+                }
+
+                match self.last_timed_game {
+                    None => (),
+                    Some(v) => {
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "You won {} round(s) in your last timed game",
+                                v
+                            ))
+                            .color(Color32::DARK_GREEN)
+                            .size(18.0)
+                            .monospace(),
+                        );
+                    }
+                }
+
                 ui.add_space(5.0);
 
                 ui.collapsing("How to play", |ui| {
@@ -285,12 +395,14 @@ impl eframe::App for MyApp {
                             self.in_timed_round = false;
                         }
 
+                        self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                     }
 
                     if self.auto_play && self.board.num_star_cnt == 0 {
+                        self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
@@ -328,6 +440,7 @@ impl eframe::App for MyApp {
                     self.cur_move_cnt = 0;
                     self.timer = cur_time;
                     // restart and create a new game
+                    self.in_game = true;
                     self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 } else {
@@ -458,11 +571,11 @@ impl eframe::App for MyApp {
                         // let texture = get_texture(self,ui,img_id);
                         // Show the image:
                         // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
+                        self.cur_move_cnt += 1;
                         if self.board.num_star_cnt == 0 {
                             #[cfg(target_arch = "x86_64")]
                             play_sound("win");
                         }
-                        self.cur_move_cnt += 1;
                     }
                     // validate goali and j so they are within bounds
                     if !(move_piece.goal_i >= 8 || move_piece.goal_j >= 8) {
@@ -477,44 +590,48 @@ impl eframe::App for MyApp {
             }
 
             ui.vertical_centered_justified(|ui| {
-                if self.board.num_star_cnt == 0 && self.cur_move_cnt == self.optimal_move_cnt {
-                    self.cur_timed_num_wins += 1;
-                }
-                if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play {
-                    ui.add_space(15.0);
-                    ui.label(
-                        egui::RichText::new("You finished!")
-                            .color(Color32::LIGHT_GREEN)
-                            .size(25.0)
-                            .monospace(),
-                    );
-                }
-
-                match self.last_timed_game {
-                    None => (),
-                    Some(v) => {
-                        ui.add_space(10.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "You won {} round(s) in your last timed game",
-                                v
-                            ))
-                            .color(Color32::LIGHT_GREEN)
-                            .size(25.0)
-                            .monospace(),
-                        );
+                if self.board.num_star_cnt == 0 && self.in_game {
+                    self.in_game = false;
+                    match (self.cur_move_cnt - self.optimal_move_cnt).abs() {
+                        // handle point system 100 : perfect , 10, off by 1
+                        0 => {
+                            self.cur_timed_num_wins += 1;
+                            self.points += 100;
+                            self.streak += 1;
+                        },
+                        1 => {
+                            self.points += 10;
+                            self.streak = 0;
+                        },
+                        _ => self.streak = 0
                     }
                 }
+
             });
 
             // slow mode for debugging
             // let mut i = i8::MAX;
             // while i > 0  { i -= 20;}
+
+            /*
+            // confetti loop
+            if self.current_animations.contains_key("confetti") {
+                let v = self.current_animations.get_mut("confetti").unwrap();
+                let end_frame = &v.pop().unwrap();
+                ui.add(
+                egui::Image::new(end_frame, end_frame.size_vec2()));
+                if v.is_empty() {
+                    self.current_animations.remove("confetti");
+                }
+            } else {
+                self.current_animations.insert("confetti", self.animation_textures["confetti"].as_ref().unwrap().clone());
+            }
+            */
+
         });
 
-        // Resize the native window to be just the size we need it to be:
-        // frame.set_window_size(ctx.used_size());
-        if self.in_timed_round {
+        // if animations are happening, request a repaint
+        if self.in_timed_round || !self.current_animations.is_empty() {
             ctx.request_repaint();
         }
     }

@@ -13,7 +13,7 @@ path = "src/main.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rodio = { version = "0.15.0", default-features = false, features = ["wav"] }
+rodio = { version = "0.15.0", default-features = false, features = ["wav","wasm-bindgen"] }
 rand = "0.8.5"
 image = "0.24.1"
 eframe = { path = "./egui/eframe" }
