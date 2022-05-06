@@ -124,6 +124,21 @@ pub fn now_sec() -> u64 {
 }
 
 fn play_sound(name: &'static str) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use wasm_bindgen::prelude::*;
+        use web_sys::{HtmlAudioElement};
+        let sample = match name.as_str() {
+            "move" => "move.wav",
+            "win" => "win.wav",
+            "capture" => "capture.wav",
+            _ => panic!("wrong type of sound?")
+        };
+        let mut player = web_sys::HtmlAudioElement::new_with_src(sample).unwrap();
+        player.play();
+
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     thread::spawn(move || {
         use rodio::{source::Source, Decoder, OutputStream};
         use std::io::{Cursor};
@@ -580,11 +595,9 @@ impl<'a> eframe::App for MyApp<'a> {
                         if self.board.board[move_piece.goal_i][move_piece.goal_j]
                             == chess::STAR_VALUE
                         {
-                            #[cfg(target_arch = "x86_64")]
                             play_sound("capture");
                             self.board.num_star_cnt -= 1;
                         } else {
-                            #[cfg(target_arch = "x86_64")]
                             play_sound("move");
                         }
                         self.board.update_board(&move_piece);
@@ -596,7 +609,6 @@ impl<'a> eframe::App for MyApp<'a> {
                             self.cur_move_cnt += 1;
                         }
                         if self.board.num_star_cnt == 0 && self.in_game {
-                            #[cfg(target_arch = "x86_64")]
                             play_sound("win");
                         }
                     }

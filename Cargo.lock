@@ -1044,6 +1044,8 @@ dependencies = [
  "rand",
  "rodio",
  "tracing-wasm",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
