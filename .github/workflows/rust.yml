@@ -57,7 +57,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           body: Lilearn release!
-          tag_name: beta
+          tag_name: one
           generate_release_notes: true
           files: |
             lilearn_${{ matrix.target }}.zip
@@ -92,7 +92,7 @@ jobs:
       with:
         files: lilearn_${{ matrix.target }}.zip
         body: Lilearn release! 
-        tag_name: beta
+        tag_name: one
         generate_release_notes: true
 
   mac_build:
