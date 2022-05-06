@@ -39,7 +39,9 @@ pub struct MyApp<'a> {
     last_timed_game: Option<i32>,
     // stats
     points: u64,
-    streak: u64
+    streak: u64,
+    // ui sizing
+    board_width: Option<f32>
 }
 
 enum PieceStates {
@@ -74,7 +76,8 @@ impl Default for MyApp<'_> {
             starting_timer: 2000,
             streak: 0,
             points: 0,
-            in_game: true
+            in_game: true,
+            board_width: None,
         }
     }
 }
@@ -417,8 +420,11 @@ impl<'a> eframe::App for MyApp<'a> {
             });
 
         // set window colors
+        visuals = egui::Visuals::dark();
         visuals.override_text_color = Some(Color32::from_gray(255));
         visuals.widgets.noninteractive.bg_fill = Color32::BLACK;
+        visuals.selection.bg_fill = Color32::RED;
+        visuals.extreme_bg_color = Color32::from_gray(100);
         ctx.set_visuals(visuals);
         
         egui::containers::CentralPanel::default()
@@ -428,17 +434,18 @@ impl<'a> eframe::App for MyApp<'a> {
             ..Default::default()
         })    
         .show(ctx, |ui| {
+            let mut show_progress_bar = false;
+            // get cur time and compare
+            #[cfg(not(target_arch = "wasm32"))]
+            let cur_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs();
+            
+            #[cfg(target_arch = "wasm32")]
+            let cur_time =  now_sec();
             if self.in_timed_round {
-                // get cur time and compare
-                #[cfg(not(target_arch = "wasm32"))]
-                let cur_time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs();
-                
-                #[cfg(target_arch = "wasm32")]
-                let cur_time =  now_sec();
-                
+            
                 if self.timer + self.starting_timer <= cur_time {
                     self.in_timed_round = false;
                     self.last_timed_game = Some(self.cur_timed_num_wins);
@@ -450,19 +457,27 @@ impl<'a> eframe::App for MyApp<'a> {
                     self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                     self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                 } else {
-                    ui.label(format!("Time left: {}",self.starting_timer - (cur_time - self.timer)));
+                    show_progress_bar = true;
                 }
             }
             ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
             ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
-            ui.add_space(5.0);
-            // println!("{}",self.board.num_optimal_moves_to_star());
+            if show_progress_bar {
+                ui.label(format!("Time left: {}",self.starting_timer - (cur_time - self.timer)));
+                let ratio_f = (cur_time - self.timer) as f32/ self.starting_timer as f32;
+                match self.board_width {
+                    Some(v) => ui.add(egui::ProgressBar::new(ratio_f).desired_width(v)),
+                    None => ui.add(egui::ProgressBar::new(ratio_f))
+                };
+                ui.add_space(4.0)
+            }
             let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
+            let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0); // width of square
+            self.board_width = Some(size*8.0);
             let mut piece_state = PieceStates::NoDrag;
-
+            ui.add_space(5.0);
             for i in 0..8 {
                 for j in 0..8 {
-                    let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0);
                     let sq = Rect {
                         min: Pos2 {
                             x: j as f32 * size + r.min.x,
