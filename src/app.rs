@@ -476,16 +476,20 @@ impl<'a> eframe::App for MyApp<'a> {
                 }
             }
             ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
+            ui.add_space(3.0);
             ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
+            ui.add_space(3.0);
             if show_progress_bar {
                 ui.label(format!("Time left: {}",self.starting_timer - (cur_time - self.timer)));
+                ui.add_space(1.0);
                 let ratio_f = (cur_time - self.timer) as f32/ self.starting_timer as f32;
                 match self.board_width {
                     Some(v) => ui.add(egui::ProgressBar::new(ratio_f).desired_width(v)),
                     None => ui.add(egui::ProgressBar::new(ratio_f))
                 };
-                ui.add_space(4.0)
+                ui.add_space(3.0);
             }
+            ui.add_space(4.0);
             let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
             let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0); // width of square
             self.board_width = Some(size*8.0);
