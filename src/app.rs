@@ -2,9 +2,9 @@
 
 #[path = "./chess.rs"]
 mod chess;
-use chess::{LiBoard, MovePiece, QUEEN_WHITE};
+use chess::{LiBoard, MovePiece};
 use eframe::{
-    egui::{self, CollapsingHeader, Sense, Ui, TextBuffer},
+    egui::{self, Sense, Ui, TextBuffer, TextureOptions},
     emath::{Numeric, Pos2, Rect, Vec2},
     epaint::{Color32, ColorImage, TextureHandle},
 };
@@ -218,7 +218,7 @@ fn get_animation_textures<'a>(app: &'a mut MyApp, ui: &'a mut Ui,name: &'static 
             let frames = load_frames(GIFS[0]);
             let mut handles: Vec<TextureHandle> = Vec::new();
             for img in frames {
-                handles.push(ui.ctx().load_texture(name, img));
+                handles.push(ui.ctx().load_texture(name, img, TextureOptions::default()));
             }
             handles
         });
@@ -241,18 +241,18 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
             let mut name;
             if img_id == chess::STAR_VALUE {
                 // load star
-                img = load_image(IMAGES[0].clone()).unwrap();
+                img = load_image(IMAGES[0]).unwrap();
                 name = "star_img";
             } else if img_id == 24 {
                 // TODO remove magic nums
-                img = load_image(IMAGES[5].clone()).unwrap();
+                img = load_image(IMAGES[5]).unwrap();
                 name = "fire";
             }
             else {
-                img = load_image(IMAGES[img_id_map(img_id)].clone()).unwrap();
+                img = load_image(IMAGES[img_id_map(img_id)]).unwrap();
                 name = "others"; // TODO fix
             }
-            ui.ctx().load_texture(name, img)
+            ui.ctx().load_texture(name, img, TextureOptions::default())
         });
 
     app.textures[&img_id].as_ref().unwrap()

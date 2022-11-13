@@ -2,6 +2,7 @@
 name = "lilearn"
 default-run = "lilearn"
 version = "0.1.0"
+rust-version = "1.65"
 edition = "2021"
 authors = ["Arshia S"]
 
@@ -10,13 +11,14 @@ name = "lilearn"
 path = "src/main.rs"
 
 [lib]
+name = "lib"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rodio = { version = "0.15.0", default-features = false, features = ["wav","wasm-bindgen"] }
-rand = "0.8.5"
-image = "0.24.1"
-eframe = { path = "./egui/eframe" }
+rodio = { version = "0.16.0", default-features = false }
+rand = { version = "0.8.5", default-features = true }
+image = { version = "0.24.1", default-features = true }
+eframe = { path = "./egui/crates/eframe" }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
