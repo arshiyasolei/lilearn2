@@ -36,10 +36,10 @@ impl LiBoard {
         let mut star_pairs = Vec::new();
         let mut already_added_stars = HashMap::new();
 
-        let mut main_piece_i = rand::random::<u8>() % 8;
-        let mut main_piece_j = rand::random::<u8>() % 8;
+        let main_piece_i = rand::random::<u8>() % 8;
+        let main_piece_j = rand::random::<u8>() % 8;
         already_added_stars.insert((main_piece_i, main_piece_j), 0);
-        for v in 0..star_cnt {
+        for _v in 0..star_cnt {
             let mut sample = (rand::random::<u8>() % 8, rand::random::<u8>() % 8);
             while already_added_stars.contains_key(&sample) {
                 sample = (rand::random::<u8>() % 8, rand::random::<u8>() % 8);
@@ -90,7 +90,7 @@ impl LiBoard {
                     }
                     start += 1;
                 }
-                return 0;
+                0
             } else {
                 let mut start = j - 1;
                 while start >= m_piece.goal_j as i8 {
@@ -104,7 +104,7 @@ impl LiBoard {
                     }
                     start -= 1;
                 }
-                return 0;
+                0
             }
         }
         // horizontal
@@ -122,7 +122,7 @@ impl LiBoard {
                     }
                     start += 1;
                 }
-                return 0;
+                0
             } else {
                 let mut start = i - 1;
                 while start >= m_piece.goal_i as i8 {
@@ -136,7 +136,7 @@ impl LiBoard {
                     }
                     start -= 1;
                 }
-                return 0;
+                0
             }
         }
         // everything else (diagonals)
@@ -157,7 +157,7 @@ impl LiBoard {
                     temp += 1;
                     start += 1;
                 }
-                return 0;
+                0
             } else if (j < m_piece.goal_j as i8) && (i > m_piece.goal_i as i8) {
                 temp = i - 1;
                 let mut start = j + 1;
@@ -173,7 +173,7 @@ impl LiBoard {
                     temp -= 1;
                     start += 1;
                 }
-                return 0;
+                0
             } else if (j > m_piece.goal_j as i8) && (i < m_piece.goal_i as i8) {
                 temp = i + 1;
                 let mut start = j - 1;
@@ -189,7 +189,7 @@ impl LiBoard {
                     temp += 1;
                     start -= 1;
                 }
-                return 0;
+                0
             } else {
                 temp = i - 1;
                 let mut start = j - 1;
@@ -205,7 +205,7 @@ impl LiBoard {
                     temp -= 1;
                     start -= 1;
                 }
-                return 0;
+                0
             }
         }
     }
@@ -214,21 +214,17 @@ impl LiBoard {
         let i = m_piece.i as i8;
         let j = m_piece.j as i8;
 
-        if ((m_piece.goal_i as i8 - i).abs() == 0) || ((m_piece.goal_j as i8 - j).abs() == 0) {
-            if self.is_jumping_over_piece(m_piece) == 0 {
-                return 1;
-            }
+        if (((m_piece.goal_i as i8 - i).abs() == 0) || ((m_piece.goal_j as i8 - j).abs() == 0)) && self.is_jumping_over_piece(m_piece) == 0 {
+            return 1;
         }
-        return 0;
+        0
     }
     pub fn validate_move_bishop(&self, m_piece: &MovePiece) -> i8 {
         let i = m_piece.i as i8;
         let j = m_piece.j as i8;
         // part one of validity
-        if (m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs() {
-            if self.is_jumping_over_piece(m_piece) == 0 {
-                return 1;
-            }
+        if (m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs() && self.is_jumping_over_piece(m_piece) == 0 {
+            return 1;
         }
         0
     }
@@ -236,13 +232,9 @@ impl LiBoard {
         let i = m_piece.i as i8;
         let j = m_piece.j as i8;
         // part one of validity
-        if ((m_piece.goal_i as i8 - i).abs() == 0)
-            || ((m_piece.goal_j as i8 - j).abs() == 0)
-            || ((m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs())
-        {
-            if self.is_jumping_over_piece(m_piece) == 0 {
-                return 1;
-            }
+        if (((m_piece.goal_i as i8 - i).abs() == 0)
+            || ((m_piece.goal_j as i8 - j).abs() == 0) || ((m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs())) && self.is_jumping_over_piece(m_piece) == 0 {
+            return 1;
         }
         0
     }
@@ -305,7 +297,7 @@ impl LiBoard {
 
 use std::cmp;
 use std::collections::VecDeque;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap};
 
 impl LiBoard {
     // returns all the possible board combinations
@@ -325,7 +317,7 @@ impl LiBoard {
                 }
             }
         }
-        return moves;
+        moves
     }
     // calculates the number of moves to optimally collect all stars
     // The idea is to perform a breadth first search till the desired move is found
@@ -347,13 +339,13 @@ impl LiBoard {
                 board: current_queue.front().unwrap().2,
             };
             // if board is not in visited
-            if !visited.contains_key(&cur_board.board) {
+            if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(cur_board.board) {
                 // add to visited
                 let cur_starcount = current_queue.front().unwrap().0;
                 let cur_move_count = current_queue.front().unwrap().1;
                 let piece_ipos = current_queue.front().unwrap().3;
                 let piece_jpos = current_queue.front().unwrap().4;
-                visited.insert(cur_board.board, cur_move_count);
+                e.insert(cur_move_count);
                 if cur_starcount == self.num_star_cnt {
                     min_num = cmp::min(current_queue.front().unwrap().1, min_num);
                     return min_num;
@@ -393,7 +385,7 @@ impl LiBoard {
             }
         }
         // println!("size of visited {}", visited.len());
-        return min_num;
+        min_num
     }
 }
 

@@ -5,11 +5,11 @@ mod chess;
 use chess::{LiBoard, MovePiece};
 use eframe::{
     egui::{self, Sense, Ui, TextBuffer, TextureOptions},
-    emath::{Numeric, Pos2, Rect, Vec2},
-    epaint::{Color32, ColorImage, TextureHandle},
+    emath::{Pos2, Rect},
+    epaint::{Color32, TextureHandle},
 };
-use std::{collections::HashMap, hash::Hash, ptr::NonNull, slice::from_mut};
-use std::{path::Path, thread};
+use std::{collections::HashMap};
+use std::{thread};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // store main app state here?...
@@ -166,7 +166,7 @@ pub fn load_icon() -> Result< eframe::IconData , image::ImageError>{
     let image = image::load_from_memory_with_format(IMAGES[1], image::ImageFormat::Png).unwrap();
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
-    let pixels = image_buffer.as_flat_samples();
+    let _pixels = image_buffer.as_flat_samples();
     Ok(eframe::IconData {
         rgba: image_buffer.to_vec(),
         width: size[0],
@@ -187,8 +187,8 @@ pub fn load_image(img: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
 
 // for animations
 pub fn load_frames(gif: &[u8]) ->  Vec<egui::ColorImage> {
-    use image::codecs::gif::{GifDecoder, GifEncoder};
-    use image::{ImageDecoder, AnimationDecoder};
+    use image::codecs::gif::{GifDecoder};
+    use image::{AnimationDecoder};
     use std::io::{Cursor};
     let file = Cursor::new(gif);
     let decoder = GifDecoder::new(file).unwrap();
@@ -203,13 +203,11 @@ pub fn load_frames(gif: &[u8]) ->  Vec<egui::ColorImage> {
     res
 }
 
-fn get_animation_textures<'a>(app: &'a mut MyApp, ui: &'a mut Ui,name: &'static str) -> &'a Vec<TextureHandle> {
+fn get_animation_textures<'a>(app: &'a mut MyApp<'_>, ui: &'a mut Ui,name: &'static str) -> &'a Vec<TextureHandle> {
 
     // where to draw currently dragged image
     // insert id if it isn't there
-    if !app.animation_textures.contains_key(&name) {
-        app.animation_textures.insert(name, None);
-    }
+    app.animation_textures.entry(name).or_insert(None);
 
     app.animation_textures
         .get_mut(&name)
@@ -226,19 +224,17 @@ fn get_animation_textures<'a>(app: &'a mut MyApp, ui: &'a mut Ui,name: &'static 
     app.animation_textures[&name].as_ref().unwrap()
 }
 
-fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
+fn get_texture<'a>(app: &'a mut MyApp<'_>, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
     // where to draw currently dragged image
     // insert id if it isn't there
-    if !app.textures.contains_key(&img_id) {
-        app.textures.insert(img_id, None);
-    }
+    app.textures.entry(img_id).or_insert(None);
 
     app.textures
         .get_mut(&img_id)
         .unwrap()
         .get_or_insert_with(|| {
-            let mut img;
-            let mut name;
+            let img;
+            let name;
             if img_id == chess::STAR_VALUE {
                 // load star
                 img = load_image(IMAGES[0]).unwrap();
@@ -259,7 +255,7 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
 }
 
 impl<'a> eframe::App for MyApp<'a> {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Controls styles
         let mut visuals = egui::Visuals::light();
         visuals.window_shadow = egui::epaint::Shadow::small_dark();
@@ -512,10 +508,8 @@ impl<'a> eframe::App for MyApp<'a> {
                         if i % 2 == 0 {
                             temp_color = self.board_light_sq_color;
                         }
-                    } else {
-                        if i % 2 == 1 {
-                            temp_color = self.board_light_sq_color;
-                        }
+                    } else if i % 2 == 1 {
+                        temp_color = self.board_light_sq_color;
                     };
                     let piece_resp = ui.allocate_rect(sq, Sense::drag());
 
@@ -553,7 +547,7 @@ impl<'a> eframe::App for MyApp<'a> {
                         ui.painter().rect_filled(sq, 0.0, temp_color);
                     } else if piece_resp.dragged() && piece_being_moved != chess::STAR_VALUE {
                         // currently dragging.. draw the texture at current mouse pos
-                        if !cur_input_pos.is_none() && piece_being_moved != 0 {
+                        if cur_input_pos.is_some() && piece_being_moved != 0 {
                             let cur_input_pos = cur_input_pos.unwrap();
                             // draw at the center of mouse when grabbed
                             let start_of_rec = Pos2 {
@@ -628,7 +622,7 @@ impl<'a> eframe::App for MyApp<'a> {
                 _ => (),
             }
 
-            ui.vertical_centered_justified(|ui| {
+            ui.vertical_centered_justified(|_ui| {
                 if self.board.num_star_cnt == 0 && self.in_game {
                     self.in_game = false;
                     match (self.cur_move_cnt - self.optimal_move_cnt).abs() {
