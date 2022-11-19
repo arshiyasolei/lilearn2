@@ -1,5 +1,5 @@
 [package]
-name = "lilearn"
+name = "lilearn2"
 default-run = "lilearn"
 version = "0.1.0"
 rust-version = "1.65"
@@ -15,16 +15,13 @@ name = "lib"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rodio = { version = "0.16.0", default-features = false }
+rodio = { version = "0.16.0", default-features = false, features = ["wav"] }
 rand = { version = "0.8.5", default-features = true }
 image = { version = "0.24.1", default-features = true }
 eframe = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
+egui = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
 
 # web:
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-console_error_panic_hook = "0.1.6"
-tracing-wasm = "0.2"
-wasm-bindgen = "0.2.80"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 version = "0.3.4"
@@ -32,9 +29,10 @@ features = [
     'HtmlAudioElement'
 ]
 
-
 [profile.release]
 opt-level = 2 # fast and small wasm
 
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
 
-[patch.crates-io]

@@ -1,16 +1,7 @@
 // constants from prev codebase
-pub const PAWN_WHITE: i8 = 2;
-pub const PAWN_BLACK: i8 = 1;
 pub const ROOK_WHITE: i8 = 10;
-pub const ROOK_BLACK: i8 = 5;
 pub const KNIGHT_WHITE: i8 = 11;
-pub const KNIGHT_BLACK: i8 = 4;
 pub const QUEEN_WHITE: i8 = 13;
-pub const QUEEN_BLACK: i8 = 6;
-pub const BISHOP_WHITE: i8 = 12;
-pub const BISHOP_BLACK: i8 = 3;
-pub const KING_BLACK: i8 = 7;
-pub const KING_WHITE: i8 = 14;
 pub const STAR_VALUE: i8 = 99;
 
 #[derive(Debug)]
@@ -31,7 +22,6 @@ pub struct LiBoard {
 impl LiBoard {
     // set up board randomly with n stars and choice piece
     pub fn new(star_cnt: i8, choice_piece: i8) -> LiBoard {
-        use rand;
         let mut b = [[0; 8]; 8];
         let mut star_pairs = Vec::new();
         let mut already_added_stars = HashMap::new();
@@ -140,73 +130,70 @@ impl LiBoard {
             }
         }
         // everything else (diagonals)
-        else {
-            let mut temp = 0;
-            if (j < m_piece.goal_j as i8) && (i < m_piece.goal_i as i8) {
-                temp = i + 1;
-                let mut start = j + 1;
-                while start <= m_piece.goal_j as i8 {
-                    if self.board[temp as usize][start as usize] != 0 {
-                        if start == m_piece.goal_j as i8
-                            && self.board[m_piece.goal_i][m_piece.goal_j] == 99
-                        {
-                            return 0;
-                        }
-                        return 1;
+        else if (j < m_piece.goal_j as i8) && (i < m_piece.goal_i as i8) {
+            let mut temp = i + 1;
+            let mut start = j + 1;
+            while start <= m_piece.goal_j as i8 {
+                if self.board[temp as usize][start as usize] != 0 {
+                    if start == m_piece.goal_j as i8
+                        && self.board[m_piece.goal_i][m_piece.goal_j] == 99
+                    {
+                        return 0;
                     }
-                    temp += 1;
-                    start += 1;
+                    return 1;
                 }
-                0
-            } else if (j < m_piece.goal_j as i8) && (i > m_piece.goal_i as i8) {
-                temp = i - 1;
-                let mut start = j + 1;
-                while start <= m_piece.goal_j as i8 {
-                    if self.board[temp as usize][start as usize] != 0 {
-                        if start == m_piece.goal_j as i8
-                            && self.board[m_piece.goal_i][m_piece.goal_j] == 99
-                        {
-                            return 0;
-                        }
-                        return 1;
-                    }
-                    temp -= 1;
-                    start += 1;
-                }
-                0
-            } else if (j > m_piece.goal_j as i8) && (i < m_piece.goal_i as i8) {
-                temp = i + 1;
-                let mut start = j - 1;
-                while start >= m_piece.goal_j as i8 {
-                    if self.board[temp as usize][start as usize] != 0 {
-                        if start == m_piece.goal_j as i8
-                            && self.board[m_piece.goal_i][m_piece.goal_j] == 99
-                        {
-                            return 0;
-                        }
-                        return 1;
-                    }
-                    temp += 1;
-                    start -= 1;
-                }
-                0
-            } else {
-                temp = i - 1;
-                let mut start = j - 1;
-                while start >= m_piece.goal_j as i8 {
-                    if self.board[temp as usize][start as usize] != 0 {
-                        if start == m_piece.goal_j as i8
-                            && self.board[m_piece.goal_i][m_piece.goal_j] == 99
-                        {
-                            return 0;
-                        }
-                        return 1;
-                    }
-                    temp -= 1;
-                    start -= 1;
-                }
-                0
+                temp += 1;
+                start += 1;
             }
+            0
+        } else if (j < m_piece.goal_j as i8) && (i > m_piece.goal_i as i8) {
+            let mut temp = i - 1;
+            let mut start = j + 1;
+            while start <= m_piece.goal_j as i8 {
+                if self.board[temp as usize][start as usize] != 0 {
+                    if start == m_piece.goal_j as i8
+                        && self.board[m_piece.goal_i][m_piece.goal_j] == 99
+                    {
+                        return 0;
+                    }
+                    return 1;
+                }
+                temp -= 1;
+                start += 1;
+            }
+            0
+        } else if (j > m_piece.goal_j as i8) && (i < m_piece.goal_i as i8) {
+            let mut temp = i + 1;
+            let mut start = j - 1;
+            while start >= m_piece.goal_j as i8 {
+                if self.board[temp as usize][start as usize] != 0 {
+                    if start == m_piece.goal_j as i8
+                        && self.board[m_piece.goal_i][m_piece.goal_j] == 99
+                    {
+                        return 0;
+                    }
+                    return 1;
+                }
+                temp += 1;
+                start -= 1;
+            }
+            0
+        } else {
+            let mut temp = i - 1;
+            let mut start = j - 1;
+            while start >= m_piece.goal_j as i8 {
+                if self.board[temp as usize][start as usize] != 0 {
+                    if start == m_piece.goal_j as i8
+                        && self.board[m_piece.goal_i][m_piece.goal_j] == 99
+                    {
+                        return 0;
+                    }
+                    return 1;
+                }
+                temp -= 1;
+                start -= 1;
+            }
+            0
         }
     }
     pub fn validate_move_rook(&self, m_piece: &MovePiece) -> i8 {
@@ -214,7 +201,9 @@ impl LiBoard {
         let i = m_piece.i as i8;
         let j = m_piece.j as i8;
 
-        if (((m_piece.goal_i as i8 - i).abs() == 0) || ((m_piece.goal_j as i8 - j).abs() == 0)) && self.is_jumping_over_piece(m_piece) == 0 {
+        if (((m_piece.goal_i as i8 - i).abs() == 0) || ((m_piece.goal_j as i8 - j).abs() == 0))
+            && self.is_jumping_over_piece(m_piece) == 0
+        {
             return 1;
         }
         0
@@ -223,7 +212,9 @@ impl LiBoard {
         let i = m_piece.i as i8;
         let j = m_piece.j as i8;
         // part one of validity
-        if (m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs() && self.is_jumping_over_piece(m_piece) == 0 {
+        if (m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs()
+            && self.is_jumping_over_piece(m_piece) == 0
+        {
             return 1;
         }
         0
@@ -233,7 +224,10 @@ impl LiBoard {
         let j = m_piece.j as i8;
         // part one of validity
         if (((m_piece.goal_i as i8 - i).abs() == 0)
-            || ((m_piece.goal_j as i8 - j).abs() == 0) || ((m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs())) && self.is_jumping_over_piece(m_piece) == 0 {
+            || ((m_piece.goal_j as i8 - j).abs() == 0)
+            || ((m_piece.goal_i as i8 - i).abs() == (m_piece.goal_j as i8 - j).abs()))
+            && self.is_jumping_over_piece(m_piece) == 0
+        {
             return 1;
         }
         0
@@ -296,8 +290,8 @@ impl LiBoard {
 }
 
 use std::cmp;
+use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::{collections::HashMap};
 
 impl LiBoard {
     // returns all the possible board combinations
@@ -359,17 +353,13 @@ impl LiBoard {
                     {
                         // add this to currentQueue
                         let backup = LiBoard { ..cur_board };
-                        let star_flag;
-                        if cur_board.board[temp_move.goal_i][temp_move.goal_j] == STAR_VALUE {
-                            star_flag = 1;
-                        } else {
-                            star_flag = 0;
-                        }
+                        let star_flag =
+                            cur_board.board[temp_move.goal_i][temp_move.goal_j] == STAR_VALUE;
 
                         cur_board.update_board(&temp_move);
 
                         current_queue.push_back((
-                            cur_starcount + star_flag,
+                            cur_starcount + star_flag as i8,
                             cur_move_count + 1,
                             cur_board.board,
                             temp_move.goal_i as i8,

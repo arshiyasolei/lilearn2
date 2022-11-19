@@ -13,7 +13,6 @@ cargo run
 
 for web: (using WSL or any *nix)
 ```
-./setup_web.sh
-./build_web.sh
-./start_server.sh
+cargo install trunk
+trunk serve
 ```
