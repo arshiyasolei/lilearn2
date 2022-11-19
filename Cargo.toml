@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 rodio = { version = "0.16.0", default-features = false }
 rand = { version = "0.8.5", default-features = true }
 image = { version = "0.24.1", default-features = true }
-eframe = { path = "./egui/crates/eframe" }
+eframe = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
