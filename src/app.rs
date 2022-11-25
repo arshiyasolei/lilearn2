@@ -8,17 +8,15 @@ use eframe::{
     emath::{Pos2, Rect},
     epaint::{Color32, TextureHandle},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // store main app state here?...
 // egui has dragging implemented already !
-pub struct MyApp<'a> {
+pub struct MyApp {
     // pictures and animations
     textures: HashMap<i8, Option<egui::TextureHandle>>, // piece -> texture mapping
-    animation_textures: HashMap<&'a str, Option<Vec<egui::TextureHandle>>>,
-    current_animations: HashMap<&'a str, Vec<egui::TextureHandle>>,
     // game state
     board: LiBoard,
     cur_move_cnt: i8,
@@ -50,14 +48,12 @@ enum PieceStates {
     NoDrag,
 }
 
-impl Default for MyApp<'_> {
+impl Default for MyApp {
     fn default() -> Self {
         let b = chess::LiBoard::new(5, chess::QUEEN_WHITE);
         let opt_cnt = b.num_optimal_moves_to_star();
         Self {
             textures: HashMap::new(),
-            animation_textures: HashMap::new(),
-            current_animations: HashMap::new(),
             board: b,
             optimal_move_cnt: opt_cnt,
             cur_move_cnt: 0,
@@ -98,9 +94,6 @@ static AUDIO: [&[u8]; 3] = [
     include_bytes!("../sounds/win.wav").as_slice(),
     include_bytes!("../sounds/capture.wav").as_slice(),
 ];
-
-// piece GIFs
-static GIFS: [&[u8]; 1] = [include_bytes!("../images/confetti.gif").as_slice()];
 
 fn img_id_map(i: i8) -> usize {
     match i {
@@ -157,19 +150,6 @@ fn play_sound(name: &'static str) {
     });
 }
 
-#[allow(dead_code)]
-pub fn load_icon() -> Result<eframe::IconData, image::ImageError> {
-    let image = image::load_from_memory_with_format(IMAGES[1], image::ImageFormat::Png).unwrap();
-    let size = [image.width() as _, image.height() as _];
-    let image_buffer = image.to_rgba8();
-    let _pixels = image_buffer.as_flat_samples();
-    Ok(eframe::IconData {
-        rgba: image_buffer.to_vec(),
-        width: size[0],
-        height: size[1],
-    })
-}
-
 pub fn load_image(img: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
     let image = image::load_from_memory_with_format(img, image::ImageFormat::Png).unwrap();
     let size = [image.width() as _, image.height() as _];
@@ -181,52 +161,7 @@ pub fn load_image(img: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
     ))
 }
 
-// for animations
-pub fn load_frames(gif: &[u8]) -> Vec<egui::ColorImage> {
-    use image::codecs::gif::GifDecoder;
-    use image::AnimationDecoder;
-    use std::io::Cursor;
-    let file = Cursor::new(gif);
-    let decoder = GifDecoder::new(file).unwrap();
-    let frames = decoder.into_frames();
-    let frames = frames.collect_frames().expect("error decoding gif");
-    let mut res = Vec::new();
-    for elm in frames {
-        let size = [elm.buffer().width() as _, elm.buffer().height() as _];
-        let img_buf = elm.into_buffer();
-        res.push(egui::ColorImage::from_rgba_unmultiplied(
-            size,
-            img_buf.as_flat_samples().as_slice(),
-        ))
-    }
-    res
-}
-
-fn get_animation_textures<'a>(
-    app: &'a mut MyApp<'_>,
-    ui: &'a mut Ui,
-    name: &'static str,
-) -> &'a Vec<TextureHandle> {
-    // where to draw currently dragged image
-    // insert id if it isn't there
-    app.animation_textures.entry(name).or_insert(None);
-
-    app.animation_textures
-        .get_mut(&name)
-        .unwrap()
-        .get_or_insert_with(|| {
-            let frames = load_frames(GIFS[0]);
-            let mut handles: Vec<TextureHandle> = Vec::new();
-            for img in frames {
-                handles.push(ui.ctx().load_texture(name, img, TextureOptions::default()));
-            }
-            handles
-        });
-
-    app.animation_textures[&name].as_ref().unwrap()
-}
-
-fn get_texture<'a>(app: &'a mut MyApp<'_>, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
+fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
     // where to draw currently dragged image
     // insert id if it isn't there
     app.textures.entry(img_id).or_insert(None);
@@ -255,7 +190,7 @@ fn get_texture<'a>(app: &'a mut MyApp<'_>, ui: &'a mut Ui, img_id: i8) -> &'a Te
     app.textures[&img_id].as_ref().unwrap()
 }
 
-impl<'a> eframe::App for MyApp<'a> {
+impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Controls styles
         let mut visuals = egui::Visuals::light();
@@ -275,8 +210,6 @@ impl<'a> eframe::App for MyApp<'a> {
                 ..Default::default()
             })
             .show(ctx, |ui| {
-                // setup animation textures
-                get_animation_textures(self,ui,"confetti");
 
                 ui.add_space(5.0);
                 ui.vertical_centered_justified(|ui| {
@@ -641,26 +574,11 @@ impl<'a> eframe::App for MyApp<'a> {
                 // slow mode for debugging
                 // let mut i = i8::MAX;
                 // while i > 0  { i -= 20;}
-
-                /*
-                // confetti loop
-                if self.current_animations.contains_key("confetti") {
-                    let v = self.current_animations.get_mut("confetti").unwrap();
-                    let end_frame = &v.pop().unwrap();
-                    ui.add(
-                    egui::Image::new(end_frame, end_frame.size_vec2()));
-                    if v.is_empty() {
-                        self.current_animations.remove("confetti");
-                    }
-                } else {
-                    self.current_animations.insert("confetti", self.animation_textures["confetti"].as_ref().unwrap().clone());
-                }
-                */
             });
 
-        // if animations are happening, request a repaint
-        if self.in_timed_round || !self.current_animations.is_empty() {
-            ctx.request_repaint();
+        // If a timed round is happening, repaint every second. 
+        if self.in_timed_round {
+            ctx.request_repaint_after(Duration::from_secs(1));
         }
     }
 

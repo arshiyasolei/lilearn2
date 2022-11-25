@@ -14,7 +14,6 @@ fn main() {
         drag_and_drop_support: true,
         initial_window_size: Some(Vec2 { x: 730.0, y: 550.0 }),
         vsync: false,
-        icon_data: Some(app::load_icon().unwrap()),
         ..Default::default()
     };
 
