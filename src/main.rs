@@ -3,6 +3,7 @@
 #![allow(clippy::unnecessary_unwrap)]
 
 mod app;
+mod chess;
 use eframe::emath::Vec2;
 
 // When compiling natively:
@@ -13,7 +14,6 @@ fn main() {
         transparent: false,
         drag_and_drop_support: true,
         initial_window_size: Some(Vec2 { x: 730.0, y: 550.0 }),
-        vsync: false,
         ..Default::default()
     };
 
@@ -24,12 +24,15 @@ fn main() {
     );
 }
 
-
 // ----------------------------------------------------------------------------
 // When compiling for web:
 #[cfg(target_arch = "wasm32")]
-pub fn main()  {
+pub fn main() {
     let web_options = eframe::WebOptions::default();
     use lib::MyApp;
-    eframe::start_web("lilearn_id", web_options, Box::new(|cc| Box::new(MyApp::default())));
+    eframe::start_web(
+        "lilearn_id",
+        web_options,
+        Box::new(|cc| Box::new(MyApp::default())),
+    );
 }

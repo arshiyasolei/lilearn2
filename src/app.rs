@@ -1,16 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-
-#[path = "./chess.rs"]
-mod chess;
-use chess::{LiBoard, MovePiece};
+use super::chess::{self, LiBoard, MovePiece};
 use eframe::{
     egui::{self, Sense, TextBuffer, TextureOptions, Ui},
     emath::{Pos2, Rect},
     epaint::{Color32, TextureHandle},
 };
-use std::{collections::HashMap, time::Duration};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{collections::HashMap, time::Duration};
 
 // store main app state here?...
 // egui has dragging implemented already !
@@ -252,7 +249,6 @@ impl eframe::App for MyApp {
                                 v
                             ))
                             .color(Color32::DARK_GREEN)
-                            
                         );
                     }
                 }
@@ -576,7 +572,7 @@ impl eframe::App for MyApp {
                 // while i > 0  { i -= 20;}
             });
 
-        // If a timed round is happening, repaint every second. 
+        // If a timed round is happening, repaint every second.
         if self.in_timed_round {
             ctx.request_repaint_after(Duration::from_secs(1));
         }
