@@ -15,7 +15,9 @@ pub struct MovePiece {
 pub struct LiBoard {
     // 8x8 board
     pub board: [[i8; 8]; 8],
+    // Position of the player moving piece
     pub main_piece: (i8, i8),
+    // How many stars on the board at the start
     pub num_star_cnt: i8,
 }
 
@@ -382,5 +384,28 @@ impl LiBoard {
 impl Default for LiBoard {
     fn default() -> Self {
         Self::new(5, QUEEN_WHITE)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_optimal_calc() {
+        let board = LiBoard {
+            board: [
+                [QUEEN_WHITE, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, STAR_VALUE],
+            ],
+            num_star_cnt: 1,
+            main_piece: (0, 0),
+        };
+        assert_eq!(1, board.num_optimal_moves_to_star())
     }
 }
