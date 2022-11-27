@@ -408,4 +408,23 @@ mod tests {
         };
         assert_eq!(1, board.num_optimal_moves_to_star())
     }
+
+    #[test]
+    fn test_optimal_calc_2() {
+        let board = LiBoard {
+            board: [
+                [QUEEN_WHITE, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, STAR_VALUE, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, STAR_VALUE],
+            ],
+            num_star_cnt: 2,
+            main_piece: (0, 0),
+        };
+        assert_eq!(3, board.num_optimal_moves_to_star())
+    }
 }
