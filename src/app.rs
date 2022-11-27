@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 use super::chess::{self, LiBoard, MovePiece};
+use super::egui_widgets::progress_bar::ProgressBar;
 use eframe::{
     egui::{self, Sense, TextBuffer, TextureOptions, Ui},
     emath::{Pos2, Rect},
@@ -356,7 +357,7 @@ impl eframe::App for MyApp {
         visuals.override_text_color = Some(Color32::from_gray(255));
         visuals.widgets.noninteractive.bg_fill = Color32::BLACK;
         visuals.selection.bg_fill = Color32::RED;
-        visuals.extreme_bg_color = Color32::from_gray(100);
+        visuals.extreme_bg_color = Color32::from_gray(0); // ProgressBar bg color... :/
         ctx.set_visuals(visuals);
 
         egui::containers::CentralPanel::default()
@@ -400,11 +401,15 @@ impl eframe::App for MyApp {
                         "Time left: {}",
                         self.starting_timer - (cur_time - self.timer)
                     ));
-                    ui.add_space(1.0);
+                    ui.add_space(3.0);
                     let ratio_f = (cur_time - self.timer) as f32 / self.starting_timer as f32;
                     match self.board_width {
-                        Some(v) => ui.add(egui::ProgressBar::new(ratio_f).desired_width(v)),
-                        None => ui.add(egui::ProgressBar::new(ratio_f)),
+                        Some(v) => ui.add(
+                            ProgressBar::new(ratio_f)
+                                .desired_width(v)
+                                .desired_rounding(2.5),
+                        ),
+                        None => ui.add(ProgressBar::new(ratio_f).desired_rounding(2.5)),
                     };
                     ui.add_space(3.0);
                 }
@@ -438,6 +443,8 @@ impl eframe::App for MyApp {
 
                         let cur_input_pos = ctx.input().pointer.interact_pos();
                         let piece_being_moved = self.board.board[i as usize][j as usize];
+                        // paint squares
+                        ui.painter().rect_filled(sq, 0.0, temp_color);
                         if piece_resp.drag_released() {
                             // done dragging here.. potentially update board state for next frame
                             assert!(!piece_resp.dragged());
@@ -466,8 +473,6 @@ impl eframe::App for MyApp {
                                     },
                                 );
                             }
-
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
                         } else if piece_resp.dragged() && piece_being_moved != chess::STAR_VALUE {
                             // currently dragging.. draw the texture at current mouse pos
                             if cur_input_pos.is_some() && piece_being_moved != 0 {
@@ -488,19 +493,15 @@ impl eframe::App for MyApp {
 
                                 piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
                             }
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
                         } else if (!piece_resp.dragged() && !piece_resp.drag_released())
                             || piece_being_moved == chess::STAR_VALUE
                         {
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
                             // paint image
                             if piece_being_moved != 0 {
                                 let texture = get_texture(self, ui, piece_being_moved);
                                 // Show the image:
                                 egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
                             }
-                        } else {
-                            ui.painter().rect_filled(sq, 0.0, temp_color);
                         }
                     }
                 }

@@ -5,6 +5,7 @@
 mod app;
 mod chess;
 use eframe::emath::Vec2;
+mod egui_widgets;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
