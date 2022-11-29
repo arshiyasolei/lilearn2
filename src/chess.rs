@@ -311,25 +311,6 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 
 impl LiBoard {
-    // returns all the possible board combinations
-    // optimal way would be to see where we go with the current piece
-    // TODO: this is slow
-    pub fn possible_moves(i: i8, j: i8) -> Vec<MovePiece> {
-        let mut moves = Vec::new();
-        for k in 0..8 {
-            for l in 0..8 {
-                if i != k || j != l {
-                    moves.push(MovePiece {
-                        i: i as usize,
-                        j: j as usize,
-                        goal_i: k as usize,
-                        goal_j: l as usize,
-                    });
-                }
-            }
-        }
-        moves
-    }
     // calculates the number of moves to optimally collect all stars
     // The idea is to perform a breadth first search till the desired move is found
     // TODO: make bidirectional BFS
@@ -362,7 +343,14 @@ impl LiBoard {
                     return min_num;
                 }
                 current_queue.pop_front();
-                for temp_move in LiBoard::possible_moves(piece_ipos, piece_jpos) {
+                use itertools::iproduct;
+                for (k, l) in iproduct!(0..8, 0..8) {
+                    let temp_move = MovePiece {
+                        i: piece_ipos as usize,
+                        j: piece_jpos as usize,
+                        goal_i: k as usize,
+                        goal_j: l as usize,
+                    };
                     if (temp_move.i != temp_move.goal_i || temp_move.j != temp_move.goal_j)
                         && (cur_board.board[temp_move.i][temp_move.j] != 0
                             && cur_board.board[temp_move.i][temp_move.j] != STAR_VALUE
