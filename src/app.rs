@@ -515,7 +515,7 @@ impl eframe::App for MyApp {
                         egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                     }
                     PieceStates::DragReleased(piece_rect, move_piece) => {
-                        if self.board.validate_move(&move_piece) != 0 {
+                        if self.board.validate_move(&move_piece).is_valid() {
                             if self.board.board[move_piece.goal_i][move_piece.goal_j]
                                 == chess::STAR_VALUE
                             {
