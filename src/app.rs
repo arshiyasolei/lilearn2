@@ -268,7 +268,7 @@ impl eframe::App for MyApp {
 
                     ui.horizontal(|ui| {
                         ui.label("Number of stars: ");
-                        ui.add(egui::Slider::new(&mut self.star_cnt, 1..=13));
+                        ui.add(egui::Slider::new(&mut self.star_cnt, 1..=18));
                     }); 
                 }
                 egui::Grid::new("my_grid")
