@@ -1,4 +1,7 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+use crate::chess::STAR_VALUE;
+
+// hide console window on Windows in release
 use super::chess::{self, LiBoard, MovePiece};
 use super::egui_widgets::progress_bar::ProgressBar;
 use eframe::{
@@ -6,6 +9,7 @@ use eframe::{
     emath::{Pos2, Rect},
     epaint::{Color32, TextureHandle},
 };
+use egui::{Painter, PointerButton, Stroke, Vec2};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, time::Duration};
@@ -16,6 +20,8 @@ pub struct MyApp {
     // pictures and animations
     textures: HashMap<i8, Option<egui::TextureHandle>>, // piece -> texture mapping
     // game state
+    moves_played_so_far: Vec<MovePiece>,
+    arrows_to_draw: Vec<ArrowMove>,
     board: LiBoard,
     cur_move_cnt: i8,
     optimal_move_cnt: i8,
@@ -24,6 +30,9 @@ pub struct MyApp {
     board_light_sq_color: Color32,
     board_dark_sq_color: Color32,
     window_bg_color: Color32,
+    arrow_color: Color32,
+    side_panel_color: Color32,
+    arrow_thickness: f32,
     auto_play: bool,
     in_game: bool,
     // timer things
@@ -38,11 +47,25 @@ pub struct MyApp {
     streak: u64,
     // ui sizing
     board_width: Option<f32>,
+    // Manual click drag tracking. egui doesn't support figuring out what button a widget was released by.
+    secondary_clicked: bool,
+    primary_clicked: bool,
+}
+
+// Captures drawing an arrow from (start_i, start_j) to (end_i, end_j).
+// Arrows are drawn by right click.
+#[derive(Debug)]
+struct ArrowMove {
+    start_x: f32,
+    start_y: f32,
+    x: f32,
+    y: f32,
 }
 
 enum PieceStates {
     Dragged(Rect, i8),             // where to draw image and what image to draw
     DragReleased(Rect, MovePiece), // draw the image just before releasing
+    ArrowDragReleased(ArrowMove),  // where to draw arrows
     NoDrag,
 }
 
@@ -54,6 +77,8 @@ impl Default for MyApp {
             textures: HashMap::new(),
             board: b,
             optimal_move_cnt: opt_cnt,
+            moves_played_so_far: Vec::new(),
+            arrows_to_draw: Vec::new(),
             cur_move_cnt: 0,
             choice_piece: chess::QUEEN_WHITE,
             star_cnt: 5,
@@ -61,6 +86,9 @@ impl Default for MyApp {
             board_dark_sq_color: Color32::BLACK,
             auto_play: false,
             window_bg_color: Color32::BLACK,
+            arrow_color: Color32::YELLOW,
+            side_panel_color: Color32::WHITE,
+            arrow_thickness: 4.0,
             // timers
             timed: false,
             timer: 0,
@@ -72,6 +100,8 @@ impl Default for MyApp {
             points: 0,
             in_game: true,
             board_width: None,
+            secondary_clicked: false,
+            primary_clicked: false,
         }
     }
 }
@@ -204,7 +234,7 @@ impl eframe::App for MyApp {
             .resizable(true)
             .frame(egui::containers::Frame {
                 inner_margin: egui::style::Margin::from(15.0),
-                fill: Color32::WHITE,
+                fill: self.side_panel_color,
                 ..Default::default()
             })
             .show(ctx, |ui| {
@@ -270,6 +300,10 @@ impl eframe::App for MyApp {
                         ui.label("Number of stars: ");
                         ui.add(egui::Slider::new(&mut self.star_cnt, 1..=18));
                     }); 
+                    ui.horizontal(|ui| {
+                        ui.label("Arrow thickness: ");
+                        ui.add(egui::Slider::new(&mut self.arrow_thickness, 1.0..=30.0));
+                    });
                 }
                 egui::Grid::new("my_grid")
                 .num_columns(2)
@@ -277,18 +311,25 @@ impl eframe::App for MyApp {
                 .show(ui, |ui| {
                     // pick board colors
 
-                    ui.label("Dark square color picker: ");
+                    ui.label("Dark square color: ");
                     ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
                     ui.end_row();
 
-                    ui.label("Light square color picker: ");
+                    ui.label("Light square color: ");
                     ui.color_edit_button_srgba(&mut self.board_light_sq_color);
                     ui.end_row();
 
-                    ui.label("Window background color picker: ");
+                    ui.label("Window background color: ");
                     ui.color_edit_button_srgba(&mut self.window_bg_color);
                     ui.end_row();
 
+                    ui.label("Arrow color: ");
+                    ui.color_edit_button_srgba(&mut self.arrow_color);
+                    ui.end_row();
+
+                    ui.label("Side panel color: ");
+                    ui.color_edit_button_srgba(&mut self.side_panel_color);
+                    ui.end_row();
                 });
                 ui.horizontal(|ui| {
                     if !self.timed {
@@ -445,9 +486,67 @@ impl eframe::App for MyApp {
                         let piece_being_moved = self.board.board[i as usize][j as usize];
                         // paint squares
                         ui.painter().rect_filled(sq, 0.0, temp_color);
-                        if piece_resp.drag_released() {
+
+                        // Handle arrow drags
+                        if piece_resp.dragged_by(PointerButton::Secondary) {
+                            self.secondary_clicked = true;
+                            // paint image
+                            if piece_being_moved != 0 {
+                                let texture = get_texture(self, ui, piece_being_moved);
+                                // Show the image:
+                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
+                            }
+                        } else if piece_resp.dragged_by(PointerButton::Primary)
+                            && piece_being_moved != 0
+                        {
+                            self.primary_clicked = true;
+                            // currently dragging.. draw the texture at current mouse pos
+                            if cur_input_pos.is_some() && piece_being_moved != 0 {
+                                let cur_input_pos = cur_input_pos.unwrap();
+                                // draw at the center of mouse when grabbed
+                                let start_of_rec = Pos2 {
+                                    x: cur_input_pos.x - size / 2.0,
+                                    y: cur_input_pos.y - size / 2.0,
+                                };
+                                let end_of_rec = Pos2 {
+                                    x: start_of_rec.x + size,
+                                    y: start_of_rec.y + size,
+                                };
+                                let image_rect = Rect {
+                                    min: start_of_rec,
+                                    max: end_of_rec,
+                                };
+
+                                piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
+                            }
+                        }
+                        // arrow drag released
+                        else if self.secondary_clicked && piece_resp.drag_released() {
+                            self.secondary_clicked = false;
+                            let a = ctx.input().pointer.interact_pos();
+                            if a.is_some() && r.contains(a.unwrap()) {
+                                let a = a.unwrap();
+                                let goal_j = (a.x - r.min.x) / size;
+                                let goal_i = (a.y - r.min.y) / size;
+                                let start_x = (j as i8) as f32 * size + r.min.x + size / 2.0;
+                                let start_y = (i as i8) as f32 * size + r.min.y + size / 2.0;
+                                piece_state = PieceStates::ArrowDragReleased(ArrowMove {
+                                    start_x,
+                                    start_y,
+                                    x: (goal_j as i8) as f32 * size + r.min.x + size / 2.0
+                                        - start_x,
+                                    y: (goal_i as i8) as f32 * size + r.min.y + size / 2.0
+                                        - start_y,
+                                });
+                            }
+                        }
+                        // Handle primary button drags
+                        else if self.primary_clicked
+                            && piece_resp.drag_released()
+                            && piece_being_moved != STAR_VALUE
+                        {
+                            self.primary_clicked = false;
                             // done dragging here.. potentially update board state for next frame
-                            assert!(!piece_resp.dragged());
                             let a = ctx.input().pointer.interact_pos();
                             if a.is_some() && r.contains(a.unwrap()) {
                                 let a = a.unwrap();
@@ -473,29 +572,7 @@ impl eframe::App for MyApp {
                                     },
                                 );
                             }
-                        } else if piece_resp.dragged() && piece_being_moved != chess::STAR_VALUE {
-                            // currently dragging.. draw the texture at current mouse pos
-                            if cur_input_pos.is_some() && piece_being_moved != 0 {
-                                let cur_input_pos = cur_input_pos.unwrap();
-                                // draw at the center of mouse when grabbed
-                                let start_of_rec = Pos2 {
-                                    x: cur_input_pos.x - size / 2.0,
-                                    y: cur_input_pos.y - size / 2.0,
-                                };
-                                let end_of_rec = Pos2 {
-                                    x: start_of_rec.x + size,
-                                    y: start_of_rec.y + size,
-                                };
-                                let image_rect = Rect {
-                                    min: start_of_rec,
-                                    max: end_of_rec,
-                                };
-
-                                piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
-                            }
-                        } else if (!piece_resp.dragged() && !piece_resp.drag_released())
-                            || piece_being_moved == chess::STAR_VALUE
-                        {
+                        } else {
                             // paint image
                             if piece_being_moved != 0 {
                                 let texture = get_texture(self, ui, piece_being_moved);
@@ -506,7 +583,7 @@ impl eframe::App for MyApp {
                     }
                 }
 
-                // draw the "dragged piece" here
+                // Draw the "dragged piece"
                 match piece_state {
                     PieceStates::Dragged(piece_rect, img_id) => {
                         let texture = get_texture(self, ui, img_id);
@@ -546,28 +623,57 @@ impl eframe::App for MyApp {
                             }
                         }
                     }
+                    PieceStates::ArrowDragReleased(arrow_move) => {
+                        self.arrows_to_draw.push(arrow_move)
+                    }
                     _ => (),
                 }
 
-                ui.vertical_centered_justified(|_ui| {
-                    if self.board.num_star_cnt == 0 && self.in_game {
-                        self.in_game = false;
-                        match (self.cur_move_cnt - self.optimal_move_cnt).abs() {
-                            // handle point system 100 : perfect , 10, off by 1
-                            0 => {
-                                self.cur_timed_num_wins += 1;
-                                self.points += 100;
-                                self.streak += 1;
-                            }
-                            1 => {
-                                self.points += 10;
-                                self.streak = 0;
-                            }
-                            _ => self.streak = 0,
+                // Draw arrows
+                for ArrowMove {
+                    start_x,
+                    start_y,
+                    x,
+                    y,
+                } in &self.arrows_to_draw
+                {
+                    arrow(
+                        ui.painter(),
+                        Pos2::new(*start_x, *start_y),
+                        Vec2::new(*x, *y),
+                        Stroke::new(self.arrow_thickness, self.arrow_color),
+                    );
+                }
+
+                // Update game stats when all the stars are collected
+                if self.board.num_star_cnt == 0 && self.in_game {
+                    // clear arrow drawings
+                    self.arrows_to_draw.clear();
+                    self.in_game = false;
+                    match (self.cur_move_cnt - self.optimal_move_cnt).abs() {
+                        // handle point system 100 : perfect , 10, off by 1
+                        0 => {
+                            self.cur_timed_num_wins += 1;
+                            self.points += 100;
+                            self.streak += 1;
                         }
+                        1 => {
+                            self.points += 10;
+                            self.streak = 0;
+                        }
+                        _ => self.streak = 0,
+                    }
+                }
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Undo Drawing").clicked() {
+                        self.arrows_to_draw.pop();
+                    }
+
+                    if ui.button("Clear Drawing").clicked() {
+                        self.arrows_to_draw.clear()
                     }
                 });
-
                 // slow mode for debugging
                 // let mut i = i8::MAX;
                 // while i > 0  { i -= 20;}
@@ -583,4 +689,16 @@ impl eframe::App for MyApp {
         // sets window bg color
         self.window_bg_color.into()
     }
+}
+
+pub fn arrow(painter: &Painter, origin: Pos2, vec: Vec2, stroke: Stroke) {
+    use egui::emath::*;
+    let rot = Rot2::from_angle(std::f32::consts::TAU / 6.0);
+    let tip_length = 10.0 + stroke.width;
+    let tip = origin + vec;
+    let dir = vec.normalized();
+    painter.line_segment([origin, tip], stroke);
+    painter.circle_filled(tip, stroke.width / 2.0, stroke.color);
+    painter.line_segment([tip, tip - tip_length * (rot * dir)], stroke);
+    painter.line_segment([tip, tip - tip_length * (rot.inverse() * dir)], stroke);
 }

@@ -21,6 +21,7 @@ image = { version = "0.24.1", default-features = true }
 eframe = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
 egui = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
 itertools = { version = "0.10.5" }
+serde = { version = "1.0.148" , features = ["derive"] }
 
 # web:
 
@@ -29,11 +30,4 @@ version = "0.3.4"
 features = [
     'HtmlAudioElement'
 ]
-
-[profile.release]
-opt-level = 2 # fast and small wasm
-
-# Optimize all dependencies even in debug builds:
-[profile.dev.package."*"]
-opt-level = 2
 

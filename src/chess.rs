@@ -1,4 +1,5 @@
-// constants from prev codebase
+use serde::{Deserialize, Serialize};
+
 pub const PAWN_WHITE: i8 = 2;
 pub const PAWN_BLACK: i8 = 1;
 pub const ROOK_WHITE: i8 = 10;
@@ -35,6 +36,7 @@ impl MoveStatus {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LiBoard {
     // 8x8 board
     pub board: [[i8; 8]; 8],
@@ -43,6 +45,12 @@ pub struct LiBoard {
     // How many stars on the board at the start
     pub num_star_cnt: i8,
 }
+
+pub fn load_boards() {}
+
+pub fn clear_boards() {}
+
+pub fn add_board() {}
 
 impl LiBoard {
     // set up board randomly with n stars and choice piece
@@ -319,6 +327,7 @@ impl LiBoard {
         let mut max_stacksize = 1;
         let mut visited: HashMap<[[i8; 8]; 8], i8> = HashMap::new();
         let mut current_queue = VecDeque::new();
+        current_queue.reserve(100_000);
 
         current_queue.push_back((0, 0, self.board, self.main_piece.0, self.main_piece.1));
         let mut min_num = i8::MAX;
