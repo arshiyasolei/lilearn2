@@ -491,7 +491,7 @@ impl eframe::App for MyApp {
                         // Handle arrow drags
                         if piece_resp.dragged_by(PointerButton::Secondary) {
                             self.secondary_clicked = true;
-                            if cur_input_pos.is_some() {
+                            if cur_input_pos.is_some() && r.contains(cur_input_pos.unwrap()) {
                                 let a = cur_input_pos.unwrap();
                                 let goal_j = (a.x - r.min.x) / size;
                                 let goal_i = (a.y - r.min.y) / size;
