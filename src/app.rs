@@ -64,6 +64,7 @@ struct ArrowMove {
 
 enum PieceStates {
     Dragged(Rect, i8),             // where to draw image and what image to draw
+    ArrowDragged(ArrowMove),       // where to draw arrows
     DragReleased(Rect, MovePiece), // draw the image just before releasing
     ArrowDragReleased(ArrowMove),  // where to draw arrows
     NoDrag,
@@ -490,11 +491,20 @@ impl eframe::App for MyApp {
                         // Handle arrow drags
                         if piece_resp.dragged_by(PointerButton::Secondary) {
                             self.secondary_clicked = true;
-                            // paint image
-                            if piece_being_moved != 0 {
-                                let texture = get_texture(self, ui, piece_being_moved);
-                                // Show the image:
-                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
+                            if cur_input_pos.is_some() {
+                                let a = cur_input_pos.unwrap();
+                                let goal_j = (a.x - r.min.x) / size;
+                                let goal_i = (a.y - r.min.y) / size;
+                                let start_x = (j as i8) as f32 * size + r.min.x + size / 2.0;
+                                let start_y = (i as i8) as f32 * size + r.min.y + size / 2.0;
+                                piece_state = PieceStates::ArrowDragged(ArrowMove {
+                                    start_x,
+                                    start_y,
+                                    x: (goal_j as i8) as f32 * size + r.min.x + size / 2.0
+                                        - start_x,
+                                    y: (goal_i as i8) as f32 * size + r.min.y + size / 2.0
+                                        - start_y,
+                                });
                             }
                         } else if piece_resp.dragged_by(PointerButton::Primary)
                             && piece_being_moved != 0
@@ -625,6 +635,19 @@ impl eframe::App for MyApp {
                     }
                     PieceStates::ArrowDragReleased(arrow_move) => {
                         self.arrows_to_draw.push(arrow_move)
+                    }
+                    PieceStates::ArrowDragged(ArrowMove {
+                        start_x,
+                        start_y,
+                        x,
+                        y,
+                    }) => {
+                        arrow(
+                            ui.painter(),
+                            Pos2::new(start_x, start_y),
+                            Vec2::new(x, y),
+                            Stroke::new(self.arrow_thickness, self.arrow_color),
+                        );
                     }
                     _ => (),
                 }
