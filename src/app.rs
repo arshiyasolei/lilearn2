@@ -56,10 +56,10 @@ pub struct MyApp {
 // Arrows are drawn by right click.
 #[derive(Debug)]
 struct ArrowMove {
-    start_x: f32,
-    start_y: f32,
-    x: f32,
-    y: f32,
+    start_i: usize,
+    start_j: usize,
+    end_i: usize,
+    end_j: usize,
 }
 
 enum PieceStates {
@@ -383,6 +383,7 @@ impl eframe::App for MyApp {
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                        self.arrows_to_draw.clear();
                     }
 
                     if self.auto_play && self.board.num_star_cnt == 0 {
@@ -390,6 +391,7 @@ impl eframe::App for MyApp {
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                        self.arrows_to_draw.clear();
                     }
                 });
             });
@@ -430,6 +432,7 @@ impl eframe::App for MyApp {
                         self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                        self.arrows_to_draw.clear();
                     } else {
                         show_progress_bar = true;
                     }
@@ -495,16 +498,17 @@ impl eframe::App for MyApp {
                                 let a = cur_input_pos.unwrap();
                                 let goal_j = (a.x - r.min.x) / size;
                                 let goal_i = (a.y - r.min.y) / size;
-                                let start_x = (j as i8) as f32 * size + r.min.x + size / 2.0;
-                                let start_y = (i as i8) as f32 * size + r.min.y + size / 2.0;
                                 piece_state = PieceStates::ArrowDragged(ArrowMove {
-                                    start_x,
-                                    start_y,
-                                    x: (goal_j as i8) as f32 * size + r.min.x + size / 2.0
-                                        - start_x,
-                                    y: (goal_i as i8) as f32 * size + r.min.y + size / 2.0
-                                        - start_y,
+                                    start_i: i,
+                                    start_j: j,
+                                    end_i: goal_i as usize,
+                                    end_j: goal_j as usize,
                                 });
+                            }
+                            if piece_being_moved != 0 {
+                                let texture = get_texture(self, ui, piece_being_moved);
+                                // Show the image:
+                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
                             }
                         } else if piece_resp.dragged_by(PointerButton::Primary)
                             && piece_being_moved != 0
@@ -538,16 +542,17 @@ impl eframe::App for MyApp {
                                 let a = a.unwrap();
                                 let goal_j = (a.x - r.min.x) / size;
                                 let goal_i = (a.y - r.min.y) / size;
-                                let start_x = (j as i8) as f32 * size + r.min.x + size / 2.0;
-                                let start_y = (i as i8) as f32 * size + r.min.y + size / 2.0;
                                 piece_state = PieceStates::ArrowDragReleased(ArrowMove {
-                                    start_x,
-                                    start_y,
-                                    x: (goal_j as i8) as f32 * size + r.min.x + size / 2.0
-                                        - start_x,
-                                    y: (goal_i as i8) as f32 * size + r.min.y + size / 2.0
-                                        - start_y,
+                                    start_i: i,
+                                    start_j: j,
+                                    end_i: goal_i as usize,
+                                    end_j: goal_j as usize,
                                 });
+                            }
+                            if piece_being_moved != 0 {
+                                let texture = get_texture(self, ui, piece_being_moved);
+                                // Show the image:
+                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
                             }
                         }
                         // Handle primary button drags
@@ -637,11 +642,16 @@ impl eframe::App for MyApp {
                         self.arrows_to_draw.push(arrow_move)
                     }
                     PieceStates::ArrowDragged(ArrowMove {
-                        start_x,
-                        start_y,
-                        x,
-                        y,
+                        start_i,
+                        start_j,
+                        end_i,
+                        end_j,
                     }) => {
+                        let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
+                        let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
+
+                        let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
+                        let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
                         arrow(
                             ui.painter(),
                             Pos2::new(start_x, start_y),
@@ -653,17 +663,22 @@ impl eframe::App for MyApp {
                 }
 
                 // Draw arrows
-                for ArrowMove {
-                    start_x,
-                    start_y,
-                    x,
-                    y,
-                } in &self.arrows_to_draw
-                {
+                for arrow_move in &self.arrows_to_draw {
+                    let ArrowMove {
+                        start_i,
+                        start_j,
+                        end_i,
+                        end_j,
+                    } = *arrow_move.clone();
+                    let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
+                    let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
+
+                    let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
+                    let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
                     arrow(
                         ui.painter(),
-                        Pos2::new(*start_x, *start_y),
-                        Vec2::new(*x, *y),
+                        Pos2::new(start_x, start_y),
+                        Vec2::new(x, y),
                         Stroke::new(self.arrow_thickness, self.arrow_color),
                     );
                 }
