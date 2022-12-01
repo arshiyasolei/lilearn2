@@ -46,12 +46,6 @@ pub struct LiBoard {
     pub num_star_cnt: i8,
 }
 
-pub fn load_boards() {}
-
-pub fn clear_boards() {}
-
-pub fn add_board() {}
-
 impl LiBoard {
     // set up board randomly with n stars and choice piece
     pub fn new(star_cnt: i8, choice_piece: i8) -> LiBoard {

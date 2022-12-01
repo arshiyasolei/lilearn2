@@ -20,7 +20,6 @@ pub struct MyApp {
     // pictures and animations
     textures: HashMap<i8, Option<egui::TextureHandle>>, // piece -> texture mapping
     // game state
-    moves_played_so_far: Vec<MovePiece>,
     arrows_to_draw: Vec<ArrowMove>,
     board: LiBoard,
     cur_move_cnt: i8,
@@ -79,12 +78,11 @@ impl Default for MyApp {
             board: b,
             show_side_panel: true,
             optimal_move_cnt: opt_cnt,
-            moves_played_so_far: Vec::new(),
             arrows_to_draw: Vec::new(),
             cur_move_cnt: 0,
             choice_piece: chess::QUEEN_WHITE,
             star_cnt: 5,
-            board_light_sq_color: Color32::WHITE,
+            board_light_sq_color: Color32::from_rgba_premultiplied(213, 213, 213, 170),
             board_dark_sq_color: Color32::BLACK,
             auto_play: false,
             window_bg_color: Color32::BLACK,
