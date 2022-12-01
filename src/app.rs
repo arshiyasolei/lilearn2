@@ -89,7 +89,7 @@ impl Default for MyApp {
             auto_play: false,
             window_bg_color: Color32::BLACK,
             arrow_color: Color32::from_rgba_premultiplied(81, 171, 0, 104),
-            side_panel_dark_mode: false,
+            side_panel_dark_mode: true,
             // timers
             timed: false,
             timer: 0,
