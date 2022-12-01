@@ -31,7 +31,7 @@ pub struct MyApp {
     board_dark_sq_color: Color32,
     window_bg_color: Color32,
     arrow_color: Color32,
-    side_panel_color: Color32,
+    side_panel_dark_mode: bool,
     auto_play: bool,
     in_game: bool,
     show_side_panel: bool,
@@ -89,7 +89,7 @@ impl Default for MyApp {
             auto_play: false,
             window_bg_color: Color32::BLACK,
             arrow_color: Color32::from_rgba_premultiplied(81, 171, 0, 104),
-            side_panel_color: Color32::WHITE,
+            side_panel_dark_mode: false,
             // timers
             timed: false,
             timer: 0,
@@ -222,8 +222,15 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Controls styles
-        let mut visuals = egui::Visuals::light();
-        visuals.window_shadow = egui::epaint::Shadow::small_dark();
+        let mut visuals = if !self.side_panel_dark_mode {
+            let mut v = egui::Visuals::light();
+            v.window_shadow = egui::epaint::Shadow::small_dark();
+            v
+        } else {
+            let mut v = egui::Visuals::dark();
+            v.override_text_color = Some(Color32::from_gray(245));
+            v
+        };
         visuals.widgets.noninteractive.bg_stroke.width = 0.0;
         ctx.tessellation_options().feathering_size_in_pixels = 0.3;
         let mut style: egui::Style = (*ctx.style()).clone();
@@ -236,7 +243,7 @@ impl eframe::App for MyApp {
             .resizable(true)
             .frame(egui::containers::Frame {
                 inner_margin: egui::style::Margin::from(15.0),
-                fill: self.side_panel_color,
+                fill: if !self.side_panel_dark_mode { Color32::WHITE } else { Color32::BLACK },
                 ..Default::default()
             })
             .show(ctx, |ui| {
@@ -325,8 +332,8 @@ impl eframe::App for MyApp {
                     ui.color_edit_button_srgba(&mut self.arrow_color);
                     ui.end_row();
 
-                    ui.label("Side panel color: ");
-                    ui.color_edit_button_srgba(&mut self.side_panel_color);
+                    ui.label("Side panel dark mode: ");
+                    ui.checkbox(&mut self.side_panel_dark_mode, "");
                     ui.end_row();
                 });
                 ui.horizontal(|ui| {
