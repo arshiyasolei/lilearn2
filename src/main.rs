@@ -14,6 +14,7 @@ fn main() {
         // Let's show off that we support transparent windows
         transparent: false,
         drag_and_drop_support: true,
+        vsync: false,
         initial_window_size: Some(Vec2 { x: 730.0, y: 550.0 }),
         ..Default::default()
     };
