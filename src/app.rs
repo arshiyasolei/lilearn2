@@ -53,7 +53,7 @@ pub struct MyApp {
 
 // Captures drawing an arrow from (start_i, start_j) to (end_i, end_j).
 // Arrows are drawn by right click.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ArrowMove {
     start_i: usize,
     start_j: usize,
@@ -67,6 +67,28 @@ enum PieceStates {
     DragReleased(Rect, MovePiece), // draw the image just before releasing
     ArrowDragReleased(ArrowMove),  // where to draw arrows
     NoDrag,
+}
+
+impl MyApp {
+    fn draw_arrow(&self, arrow_move: ArrowMove, painter: &Painter, size: f32, r: Rect) {
+        let ArrowMove {
+            start_i,
+            start_j,
+            end_i,
+            end_j,
+        } = arrow_move;
+        let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
+        let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
+
+        let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
+        let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
+        arrow(
+            painter,
+            Pos2::new(start_x, start_y),
+            Vec2::new(x, y),
+            Stroke::new(size / 5.0, self.arrow_color),
+        );
+    }
 }
 
 impl Default for MyApp {
@@ -667,10 +689,6 @@ impl eframe::App for MyApp {
                                 play_sound("move");
                             }
                             self.board.update_board(&move_piece);
-                            // let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
-                            // let texture = get_texture(self,ui,img_id);
-                            // Show the image:
-                            // egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                             if self.in_game {
                                 self.cur_move_cnt += 1;
                             }
@@ -689,48 +707,17 @@ impl eframe::App for MyApp {
                         }
                     }
                     PieceStates::ArrowDragReleased(arrow_move) => {
-                        self.arrows_to_draw.push(arrow_move)
+                        self.arrows_to_draw.push(arrow_move);
                     }
-                    PieceStates::ArrowDragged(ArrowMove {
-                        start_i,
-                        start_j,
-                        end_i,
-                        end_j,
-                    }) => {
-                        let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
-                        let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
-
-                        let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
-                        let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
-                        arrow(
-                            ui.painter(),
-                            Pos2::new(start_x, start_y),
-                            Vec2::new(x, y),
-                            Stroke::new(size / 4.0, self.arrow_color),
-                        );
+                    PieceStates::ArrowDragged(arrow_move) => {
+                        self.draw_arrow(arrow_move.clone(), ui.painter(), size, r);
                     }
                     _ => (),
                 }
 
                 // Draw arrows
                 for arrow_move in &self.arrows_to_draw {
-                    let ArrowMove {
-                        start_i,
-                        start_j,
-                        end_i,
-                        end_j,
-                    } = *arrow_move.clone();
-                    let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
-                    let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
-
-                    let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
-                    let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
-                    arrow(
-                        ui.painter(),
-                        Pos2::new(start_x, start_y),
-                        Vec2::new(x, y),
-                        Stroke::new(size / 4.0, self.arrow_color),
-                    );
+                    self.draw_arrow(arrow_move.clone(), ui.painter(), size, r);
                 }
 
                 // Update game stats when all the stars are collected
