@@ -32,7 +32,6 @@ pub struct MyApp {
     window_bg_color: Color32,
     arrow_color: Color32,
     side_panel_color: Color32,
-    arrow_thickness: f32,
     auto_play: bool,
     in_game: bool,
     // timer things
@@ -87,9 +86,8 @@ impl Default for MyApp {
             board_dark_sq_color: Color32::BLACK,
             auto_play: false,
             window_bg_color: Color32::BLACK,
-            arrow_color: Color32::YELLOW,
+            arrow_color: Color32::from_rgba_premultiplied(81, 171, 0, 104),
             side_panel_color: Color32::WHITE,
-            arrow_thickness: 4.0,
             // timers
             timed: false,
             timer: 0,
@@ -301,10 +299,6 @@ impl eframe::App for MyApp {
                         ui.label("Number of stars: ");
                         ui.add(egui::Slider::new(&mut self.star_cnt, 1..=18));
                     }); 
-                    ui.horizontal(|ui| {
-                        ui.label("Arrow thickness: ");
-                        ui.add(egui::Slider::new(&mut self.arrow_thickness, 1.0..=30.0));
-                    });
                 }
                 egui::Grid::new("my_grid")
                 .num_columns(2)
@@ -656,7 +650,7 @@ impl eframe::App for MyApp {
                             ui.painter(),
                             Pos2::new(start_x, start_y),
                             Vec2::new(x, y),
-                            Stroke::new(self.arrow_thickness, self.arrow_color),
+                            Stroke::new(size / 4.0, self.arrow_color),
                         );
                     }
                     _ => (),
@@ -679,7 +673,7 @@ impl eframe::App for MyApp {
                         ui.painter(),
                         Pos2::new(start_x, start_y),
                         Vec2::new(x, y),
-                        Stroke::new(self.arrow_thickness, self.arrow_color),
+                        Stroke::new(size / 4.0, self.arrow_color),
                     );
                 }
 
