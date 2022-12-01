@@ -382,9 +382,7 @@ impl eframe::App for MyApp {
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                         self.arrows_to_draw.clear();
                     }
-                    ui.add_space(15.0);
-                    ui.heading("Arrow Controls");
-                    ui.add_space(5.0);
+                    ui.add_space(2.0);
 
                     if ui.button("Undo Drawing").clicked() {
                         self.arrows_to_draw.pop();
