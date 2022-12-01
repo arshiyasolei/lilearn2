@@ -218,7 +218,7 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
 }
 
 impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // Controls styles
         let mut visuals = if !self.side_panel_dark_mode {
             let mut v = egui::Visuals::light();
@@ -406,6 +406,27 @@ impl eframe::App for MyApp {
                     }
                 });
             });
+        } else {
+            let Vec2 { x, .. } = frame.info().window_info.size;
+            egui::containers::SidePanel::left("Phantom")
+                .exact_width(x / 6.0)
+                .resizable(false)
+                .frame(egui::containers::Frame {
+                    inner_margin: egui::style::Margin::from(15.0),
+                    fill: Color32::BLACK,
+                    ..Default::default()
+                })
+                .show(ctx, |_ui| {});
+
+            egui::containers::SidePanel::right("AnotherPhantom")
+                .exact_width(x / 6.0)
+                .resizable(false)
+                .frame(egui::containers::Frame {
+                    inner_margin: egui::style::Margin::from(15.0),
+                    fill: Color32::BLACK,
+                    ..Default::default()
+                })
+                .show(ctx, |_ui| {});
         }
         // set window colors
         visuals = egui::Visuals::dark();
@@ -450,14 +471,19 @@ impl eframe::App for MyApp {
                 }
                 if ui
                     .add(
-                        Button::new(RichText::new("Menu"))
-                            .fill(self.window_bg_color)
-                            .stroke(Stroke::new(0.5, Color32::WHITE)),
+                        Button::new(RichText::new(if self.show_side_panel {
+                            "Zen Mode"
+                        } else {
+                            "Menu"
+                        }))
+                        .fill(self.window_bg_color)
+                        .stroke(Stroke::new(0.5, Color32::WHITE)),
                     )
                     .clicked()
                 {
                     self.show_side_panel ^= true;
                 }
+
                 ui.add_space(3.0);
                 ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
                 ui.add_space(3.0);
