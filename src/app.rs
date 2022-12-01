@@ -9,7 +9,7 @@ use eframe::{
     emath::{Pos2, Rect},
     epaint::{Color32, TextureHandle},
 };
-use egui::{Painter, PointerButton, Stroke, Vec2};
+use egui::{Button, Painter, PointerButton, RichText, Stroke, Vec2};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, time::Duration};
@@ -34,6 +34,7 @@ pub struct MyApp {
     side_panel_color: Color32,
     auto_play: bool,
     in_game: bool,
+    show_side_panel: bool,
     // timer things
     timed: bool, // see how many rounds you can complete in X minutes
     starting_timer: u64,
@@ -76,6 +77,7 @@ impl Default for MyApp {
         Self {
             textures: HashMap::new(),
             board: b,
+            show_side_panel: true,
             optimal_move_cnt: opt_cnt,
             moves_played_so_far: Vec::new(),
             arrows_to_draw: Vec::new(),
@@ -229,7 +231,8 @@ impl eframe::App for MyApp {
         ctx.set_style(style);
         ctx.set_visuals(visuals.clone());
         // TODO add new fonts
-        egui::containers::SidePanel::left("Controls")
+        if self.show_side_panel {
+            egui::containers::SidePanel::left("Controls")
             .resizable(true)
             .frame(egui::containers::Frame {
                 inner_margin: egui::style::Margin::from(15.0),
@@ -379,6 +382,17 @@ impl eframe::App for MyApp {
                         self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
                         self.arrows_to_draw.clear();
                     }
+                    ui.add_space(15.0);
+                    ui.heading("Arrow Controls");
+                    ui.add_space(5.0);
+
+                    if ui.button("Undo Drawing").clicked() {
+                        self.arrows_to_draw.pop();
+                    }
+                    ui.add_space(2.0);
+                    if ui.button("Clear Drawing").clicked() {
+                        self.arrows_to_draw.clear()
+                    }
 
                     if self.auto_play && self.board.num_star_cnt == 0 {
                         self.in_game = true;
@@ -389,7 +403,7 @@ impl eframe::App for MyApp {
                     }
                 });
             });
-
+        }
         // set window colors
         visuals = egui::Visuals::dark();
         visuals.override_text_color = Some(Color32::from_gray(255));
@@ -431,6 +445,17 @@ impl eframe::App for MyApp {
                         show_progress_bar = true;
                     }
                 }
+                if ui
+                    .add(
+                        Button::new(RichText::new("Menu"))
+                            .fill(self.window_bg_color)
+                            .stroke(Stroke::new(0.5, Color32::WHITE)),
+                    )
+                    .clicked()
+                {
+                    self.show_side_panel ^= true;
+                }
+                ui.add_space(3.0);
                 ui.label("Number of current moves: ".to_owned() + &self.cur_move_cnt.to_string());
                 ui.add_space(3.0);
                 ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
@@ -453,7 +478,9 @@ impl eframe::App for MyApp {
                     ui.add_space(3.0);
                 }
                 ui.add_space(4.0);
-                let (r, _) = ui.allocate_at_least(ui.available_size(), Sense::click());
+                // leave some space for controls on the bottom
+                let Vec2 { x, y } = ui.available_size();
+                let (r, _) = ui.allocate_at_least(Vec2::new(x, y - 50.0), Sense::click());
                 let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0); // width of square
                 self.board_width = Some(size * 8.0);
                 let mut piece_state = PieceStates::NoDrag;
@@ -697,15 +724,6 @@ impl eframe::App for MyApp {
                     }
                 }
                 ui.add_space(10.0);
-                ui.horizontal(|ui| {
-                    if ui.button("Undo Drawing").clicked() {
-                        self.arrows_to_draw.pop();
-                    }
-
-                    if ui.button("Clear Drawing").clicked() {
-                        self.arrows_to_draw.clear()
-                    }
-                });
                 // slow mode for debugging
                 // let mut i = i8::MAX;
                 // while i > 0  { i -= 20;}
