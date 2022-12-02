@@ -13,7 +13,7 @@ pub const BISHOP_BLACK: i8 = 3;
 pub const KING_BLACK: i8 = 7;
 pub const KING_WHITE: i8 = 14;
 pub const STAR_VALUE: i8 = 99;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MovePiece {
     pub i: usize,
     pub j: usize,
@@ -36,7 +36,7 @@ impl MoveStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LiBoard {
     // 8x8 board
     pub board: [[i8; 8]; 8],
@@ -312,18 +312,27 @@ use std::cmp;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+pub type SolutionPath = rpds::Vector<MovePiece>;
 impl LiBoard {
     // calculates the number of moves to optimally collect all stars
     // The idea is to perform a breadth first search till the desired move is found
     // TODO: make bidirectional BFS
-    pub fn num_optimal_moves_to_star(&self) -> i8 {
+    pub fn num_optimal_moves_to_star(&self) -> (i8, SolutionPath) {
         // pair of (num stars collected , board)
         let mut max_stacksize = 1;
         let mut visited: HashMap<[[i8; 8]; 8], i8> = HashMap::new();
         let mut current_queue = VecDeque::new();
         current_queue.reserve(100_000);
+        let sol_path = rpds::Vector::new();
 
-        current_queue.push_back((0, 0, self.board, self.main_piece.0, self.main_piece.1));
+        current_queue.push_back((
+            0,
+            0,
+            self.board,
+            self.main_piece.0,
+            self.main_piece.1,
+            sol_path.clone(),
+        ));
         let mut min_num = i8::MAX;
         while !current_queue.is_empty() {
             max_stacksize = cmp::max(max_stacksize, current_queue.len());
@@ -340,10 +349,11 @@ impl LiBoard {
                 let cur_move_count = current_queue.front().unwrap().1;
                 let piece_ipos = current_queue.front().unwrap().3;
                 let piece_jpos = current_queue.front().unwrap().4;
+                let path = current_queue.front().unwrap().5.clone();
                 e.insert(cur_move_count);
                 if cur_starcount == self.num_star_cnt {
-                    min_num = cmp::min(current_queue.front().unwrap().1, min_num);
-                    return min_num;
+                    min_num = cmp::min(cur_move_count, min_num);
+                    return (min_num, path);
                 }
                 current_queue.pop_front();
                 use itertools::iproduct;
@@ -372,18 +382,18 @@ impl LiBoard {
                             cur_board.board,
                             temp_move.goal_i as i8,
                             temp_move.goal_j as i8,
+                            path.push_back(temp_move.clone()).clone(),
                         ));
 
                         cur_board.board = backup.board;
                     }
                 }
             } else {
-                // if position of board is
+                // Ignore if board has already been visited
                 current_queue.pop_front();
             }
         }
-        // println!("size of visited {}", visited.len());
-        min_num
+        (min_num, sol_path)
     }
 }
 
@@ -412,7 +422,7 @@ mod tests {
             num_star_cnt: 1,
             main_piece: (0, 0),
         };
-        assert_eq!(1, board.num_optimal_moves_to_star())
+        assert_eq!(1, board.num_optimal_moves_to_star().0)
     }
 
     #[test]
@@ -431,6 +441,63 @@ mod tests {
             num_star_cnt: 2,
             main_piece: (0, 0),
         };
-        assert_eq!(3, board.num_optimal_moves_to_star())
+        assert_eq!(3, board.num_optimal_moves_to_star().0)
+    }
+
+    #[test]
+    fn test_optimal_calc_3() {
+        let board = LiBoard {
+            board: [
+                [QUEEN_WHITE, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, STAR_VALUE, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, STAR_VALUE, 0, 0, 0, STAR_VALUE, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, STAR_VALUE],
+            ],
+            num_star_cnt: 4,
+            main_piece: (0, 0),
+        };
+        assert_eq!(5, board.num_optimal_moves_to_star().0)
+    }
+
+    #[test]
+    fn test_optimal_calc_4() {
+        let board = LiBoard {
+            board: [
+                [KNIGHT_WHITE, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, STAR_VALUE, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [STAR_VALUE, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, STAR_VALUE, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, STAR_VALUE],
+            ],
+            num_star_cnt: 4,
+            main_piece: (0, 0),
+        };
+        assert_eq!(10, board.num_optimal_moves_to_star().0)
+    }
+
+    #[test]
+    fn test_optimal_calc_5() {
+        let board = LiBoard {
+            board: [
+                [QUEEN_WHITE, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, STAR_VALUE],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, STAR_VALUE, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, STAR_VALUE, STAR_VALUE, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [STAR_VALUE, 0, 0, 0, 0, 0, STAR_VALUE, 0],
+            ],
+            num_star_cnt: 6,
+            main_piece: (0, 0),
+        };
+        assert_eq!(6, board.num_optimal_moves_to_star().0)
     }
 }

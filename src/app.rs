@@ -10,6 +10,7 @@ use eframe::{
     epaint::{Color32, TextureHandle},
 };
 use egui::{Button, Painter, PointerButton, RichText, Stroke, Vec2};
+use rpds::Vector;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, time::Duration};
@@ -34,6 +35,8 @@ pub struct MyApp {
     auto_play: bool,
     in_game: bool,
     show_side_panel: bool,
+    solution_path: chess::SolutionPath,
+    show_solution: bool,
     // timer things
     timed: bool, // see how many rounds you can complete in X minutes
     starting_timer: u64,
@@ -59,6 +62,23 @@ struct ArrowMove {
     start_j: usize,
     end_i: usize,
     end_j: usize,
+}
+
+impl From<MovePiece> for ArrowMove {
+    fn from(m: MovePiece) -> Self {
+        let MovePiece {
+            i,
+            j,
+            goal_i,
+            goal_j,
+        } = m;
+        Self {
+            start_i: i,
+            start_j: j,
+            end_i: goal_i,
+            end_j: goal_j,
+        }
+    }
 }
 
 enum PieceStates {
@@ -94,12 +114,13 @@ impl MyApp {
 impl Default for MyApp {
     fn default() -> Self {
         let b = chess::LiBoard::new(5, chess::QUEEN_WHITE);
-        let opt_cnt = b.num_optimal_moves_to_star();
+        let (opt_cnt, path) = b.num_optimal_moves_to_star();
         Self {
             textures: HashMap::new(),
-            board: b,
+            board: b.clone(),
             show_side_panel: true,
             optimal_move_cnt: opt_cnt,
+            solution_path: path,
             arrows_to_draw: Vec::new(),
             cur_move_cnt: 0,
             choice_piece: chess::QUEEN_WHITE,
@@ -110,6 +131,7 @@ impl Default for MyApp {
             window_bg_color: Color32::BLACK,
             arrow_color: Color32::from_rgba_premultiplied(81, 171, 0, 104),
             side_panel_dark_mode: true,
+            show_solution: false,
             // timers
             timed: false,
             timer: 0,
@@ -406,7 +428,7 @@ impl eframe::App for MyApp {
                         self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
-                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                        (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
                         self.arrows_to_draw.clear();
                     }
                     ui.add_space(2.0);
@@ -418,12 +440,16 @@ impl eframe::App for MyApp {
                     if ui.button("Clear Drawing").clicked() {
                         self.arrows_to_draw.clear()
                     }
+                    ui.add_space(2.0);
+                    if ui.add(Button::new(if self.show_solution { "Hide Solution Path" } else { "Show Solution Path"}).fill(Color32::DARK_RED)).clicked() {
+                        self.show_solution ^= true;
+                    }
 
                     if self.auto_play && self.board.num_star_cnt == 0 {
                         self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
                         self.cur_move_cnt = 0;
-                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                        (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
                         self.arrows_to_draw.clear();
                     }
                 });
@@ -485,7 +511,8 @@ impl eframe::App for MyApp {
                         // restart and create a new game
                         self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
-                        self.optimal_move_cnt = self.board.num_optimal_moves_to_star();
+                        (self.optimal_move_cnt, self.solution_path) =
+                            self.board.num_optimal_moves_to_star();
                         self.arrows_to_draw.clear();
                     } else {
                         show_progress_bar = true;
@@ -718,6 +745,12 @@ impl eframe::App for MyApp {
                 // Draw arrows
                 for arrow_move in &self.arrows_to_draw {
                     self.draw_arrow(arrow_move.clone(), ui.painter(), size, r);
+                }
+
+                if self.show_solution {
+                    for move_piece in &self.solution_path {
+                        self.draw_arrow(move_piece.clone().into(), ui.painter(), size, r);
+                    }
                 }
 
                 // Update game stats when all the stars are collected

@@ -22,7 +22,7 @@ eframe = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c
 egui = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
 itertools = { version = "0.10.5" }
 serde = { version = "1.0.148" , features = ["derive"] }
-
+rpds = { version = "0.12.0" }
 # web:
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
