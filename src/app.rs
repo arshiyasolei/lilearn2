@@ -78,20 +78,20 @@ impl From<MovePiece> for ArrowMove {
 
 enum PieceStates {
     Dragged(Rect, i8),             // where to draw image and what image to draw
-    ArrowDragged(ArrowMove),       // where to draw arrows
+    ArrowDragged(ArrowMove),       // where to draw arrows as it's being dragged
     DragReleased(Rect, MovePiece), // draw the image just before releasing
     ArrowDragReleased(ArrowMove),  // where to draw arrows
     NoDrag,
 }
 
 impl MyApp {
-    fn draw_arrow(&self, arrow_move: ArrowMove, painter: &Painter, size: f32, r: Rect) {
+    fn draw_arrow(&self, arrow_move: ArrowMove, painter: &Painter, size: f32, board_rect: Rect) {
         let ArrowMove { start_i, start_j, end_i, end_j } = arrow_move;
-        let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
-        let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
+        let start_x = (start_j as i8) as f32 * size + board_rect.min.x + size / 2.0;
+        let start_y = (start_i as i8) as f32 * size + board_rect.min.y + size / 2.0;
 
-        let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
-        let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
+        let x = (end_j as i8) as f32 * size + board_rect.min.x + size / 2.0 - start_x;
+        let y = (end_i as i8) as f32 * size + board_rect.min.y + size / 2.0 - start_y;
         arrow(painter, Pos2::new(start_x, start_y), Vec2::new(x, y), Stroke::new(size / 5.0, self.arrow_color));
     }
 }
@@ -506,8 +506,8 @@ impl eframe::App for MyApp {
                 ui.add_space(4.0);
                 // leave some space for controls on the bottom
                 let Vec2 { x, y } = ui.available_size();
-                let (r, _) = ui.allocate_at_least(Vec2::new(x, y - 50.0), Sense::click());
-                let size = ((r.max.x - r.min.x) / 8.0).min((r.max.y - r.min.y) / 8.0); // width of square
+                let (board_rect, _) = ui.allocate_at_least(Vec2::new(x, y - 50.0), Sense::click());
+                let size = ((board_rect.max.x - board_rect.min.x) / 8.0).min((board_rect.max.y - board_rect.min.y) / 8.0); // width of square
                 self.board_width = Some(size * 8.0);
                 let mut piece_state = PieceStates::NoDrag;
                 ui.add_space(5.0);
@@ -515,12 +515,12 @@ impl eframe::App for MyApp {
                     for j in 0..8 {
                         let sq = Rect {
                             min: Pos2 {
-                                x: j as f32 * size + r.min.x,
-                                y: i as f32 * size + r.min.y,
+                                x: j as f32 * size + board_rect.min.x,
+                                y: i as f32 * size + board_rect.min.y,
                             },
                             max: Pos2 {
-                                x: j as f32 * size + size + r.min.x,
-                                y: i as f32 * size + size + r.min.y,
+                                x: j as f32 * size + size + board_rect.min.x,
+                                y: i as f32 * size + size + board_rect.min.y,
                             },
                         };
                         let mut temp_color = self.board_dark_sq_color;
@@ -541,10 +541,10 @@ impl eframe::App for MyApp {
                         // Handle arrow drags
                         if piece_resp.dragged_by(PointerButton::Secondary) {
                             self.secondary_clicked = true;
-                            if cur_input_pos.is_some() && r.contains(cur_input_pos.unwrap()) {
+                            if cur_input_pos.is_some() && board_rect.contains(cur_input_pos.unwrap()) {
                                 let a = cur_input_pos.unwrap();
-                                let goal_j = (a.x - r.min.x) / size;
-                                let goal_i = (a.y - r.min.y) / size;
+                                let goal_j = (a.x - board_rect.min.x) / size;
+                                let goal_i = (a.y - board_rect.min.y) / size;
                                 piece_state = PieceStates::ArrowDragged(ArrowMove {
                                     start_i: i,
                                     start_j: j,
@@ -580,10 +580,10 @@ impl eframe::App for MyApp {
                         else if self.secondary_clicked && piece_resp.drag_released() {
                             self.secondary_clicked = false;
                             let a = ctx.input().pointer.interact_pos();
-                            if a.is_some() && r.contains(a.unwrap()) {
+                            if a.is_some() && board_rect.contains(a.unwrap()) {
                                 let a = a.unwrap();
-                                let goal_j = (a.x - r.min.x) / size;
-                                let goal_i = (a.y - r.min.y) / size;
+                                let goal_j = (a.x - board_rect.min.x) / size;
+                                let goal_i = (a.y - board_rect.min.y) / size;
                                 piece_state = PieceStates::ArrowDragReleased(ArrowMove {
                                     start_i: i,
                                     start_j: j,
@@ -602,18 +602,18 @@ impl eframe::App for MyApp {
                             self.primary_clicked = false;
                             // done dragging here.. potentially update board state for next frame
                             let a = ctx.input().pointer.interact_pos();
-                            if a.is_some() && r.contains(a.unwrap()) {
+                            if a.is_some() && board_rect.contains(a.unwrap()) {
                                 let a = a.unwrap();
-                                let goal_j = (a.x - r.min.x) / size;
-                                let goal_i = (a.y - r.min.y) / size;
+                                let goal_j = (a.x - board_rect.min.x) / size;
+                                let goal_i = (a.y - board_rect.min.y) / size;
                                 let image_rect = Rect {
                                     min: Pos2 {
-                                        x: (goal_j as i8) as f32 * size + r.min.x,
-                                        y: (goal_i as i8) as f32 * size + r.min.y,
+                                        x: (goal_j as i8) as f32 * size + board_rect.min.x,
+                                        y: (goal_i as i8) as f32 * size + board_rect.min.y,
                                     },
                                     max: Pos2 {
-                                        x: (goal_j as i8) as f32 * size + size + r.min.x,
-                                        y: (goal_i as i8) as f32 * size + size + r.min.y,
+                                        x: (goal_j as i8) as f32 * size + size + board_rect.min.x,
+                                        y: (goal_i as i8) as f32 * size + size + board_rect.min.y,
                                     },
                                 };
                                 piece_state = PieceStates::DragReleased(
@@ -674,19 +674,19 @@ impl eframe::App for MyApp {
                         self.arrows_to_draw.push(arrow_move);
                     }
                     PieceStates::ArrowDragged(arrow_move) => {
-                        self.draw_arrow(arrow_move.clone(), ui.painter(), size, r);
+                        self.draw_arrow(arrow_move.clone(), ui.painter(), size, board_rect);
                     }
                     _ => (),
                 }
 
                 // Draw arrows
                 for arrow_move in &self.arrows_to_draw {
-                    self.draw_arrow(arrow_move.clone(), ui.painter(), size, r);
+                    self.draw_arrow(arrow_move.clone(), ui.painter(), size, board_rect);
                 }
 
                 if self.show_solution {
                     for move_piece in &self.solution_path {
-                        self.draw_arrow(move_piece.clone().into(), ui.painter(), size, r);
+                        self.draw_arrow(move_piece.clone().into(), ui.painter(), size, board_rect);
                     }
                 }
 
