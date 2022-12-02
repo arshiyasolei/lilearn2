@@ -66,12 +66,7 @@ struct ArrowMove {
 
 impl From<MovePiece> for ArrowMove {
     fn from(m: MovePiece) -> Self {
-        let MovePiece {
-            i,
-            j,
-            goal_i,
-            goal_j,
-        } = m;
+        let MovePiece { i, j, goal_i, goal_j } = m;
         Self {
             start_i: i,
             start_j: j,
@@ -91,23 +86,13 @@ enum PieceStates {
 
 impl MyApp {
     fn draw_arrow(&self, arrow_move: ArrowMove, painter: &Painter, size: f32, r: Rect) {
-        let ArrowMove {
-            start_i,
-            start_j,
-            end_i,
-            end_j,
-        } = arrow_move;
+        let ArrowMove { start_i, start_j, end_i, end_j } = arrow_move;
         let start_x = (start_j as i8) as f32 * size + r.min.x + size / 2.0;
         let start_y = (start_i as i8) as f32 * size + r.min.y + size / 2.0;
 
         let x = (end_j as i8) as f32 * size + r.min.x + size / 2.0 - start_x;
         let y = (end_i as i8) as f32 * size + r.min.y + size / 2.0 - start_y;
-        arrow(
-            painter,
-            Pos2::new(start_x, start_y),
-            Vec2::new(x, y),
-            Stroke::new(size / 5.0, self.arrow_color),
-        );
+        arrow(painter, Pos2::new(start_x, start_y), Vec2::new(x, y), Stroke::new(size / 5.0, self.arrow_color));
     }
 }
 
@@ -177,12 +162,7 @@ fn img_id_map(i: i8) -> usize {
 
 #[cfg(target_arch = "wasm32")]
 pub fn now_sec() -> u64 {
-    (eframe::web_sys::window()
-        .expect("should have a Window")
-        .performance()
-        .expect("should have a Performance")
-        .now()
-        / 1000.0) as u64
+    (eframe::web_sys::window().expect("should have a Window").performance().expect("should have a Performance").now() / 1000.0) as u64
 }
 
 fn play_sound(name: &'static str) {
@@ -226,10 +206,7 @@ pub fn load_image(img: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
-    Ok(egui::ColorImage::from_rgba_unmultiplied(
-        size,
-        pixels.as_slice(),
-    ))
+    Ok(egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_slice()))
 }
 
 fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a TextureHandle {
@@ -237,26 +214,23 @@ fn get_texture<'a>(app: &'a mut MyApp, ui: &'a mut Ui, img_id: i8) -> &'a Textur
     // insert id if it isn't there
     app.textures.entry(img_id).or_insert(None);
 
-    app.textures
-        .get_mut(&img_id)
-        .unwrap()
-        .get_or_insert_with(|| {
-            let img;
-            let name;
-            if img_id == chess::STAR_VALUE {
-                // load star
-                img = load_image(IMAGES[0]).unwrap();
-                name = "star_img";
-            } else if img_id == 24 {
-                // TODO remove magic nums
-                img = load_image(IMAGES[5]).unwrap();
-                name = "fire";
-            } else {
-                img = load_image(IMAGES[img_id_map(img_id)]).unwrap();
-                name = "others"; // TODO fix
-            }
-            ui.ctx().load_texture(name, img, TextureOptions::default())
-        });
+    app.textures.get_mut(&img_id).unwrap().get_or_insert_with(|| {
+        let img;
+        let name;
+        if img_id == chess::STAR_VALUE {
+            // load star
+            img = load_image(IMAGES[0]).unwrap();
+            name = "star_img";
+        } else if img_id == 24 {
+            // TODO remove magic nums
+            img = load_image(IMAGES[5]).unwrap();
+            name = "fire";
+        } else {
+            img = load_image(IMAGES[img_id_map(img_id)]).unwrap();
+            name = "others"; // TODO fix
+        }
+        ui.ctx().load_texture(name, img, TextureOptions::default())
+    });
 
     app.textures[&img_id].as_ref().unwrap()
 }
@@ -282,178 +256,167 @@ impl eframe::App for MyApp {
         // TODO add new fonts
         if self.show_side_panel {
             egui::containers::SidePanel::left("Controls")
-            .resizable(true)
-            .frame(egui::containers::Frame {
-                inner_margin: egui::style::Margin::from(15.0),
-                fill: if !self.side_panel_dark_mode { Color32::WHITE } else { Color32::BLACK },
-                ..Default::default()
-            })
-            .show(ctx, |ui| {
+                .resizable(true)
+                .frame(egui::containers::Frame {
+                    inner_margin: egui::style::Margin::from(15.0),
+                    fill: if !self.side_panel_dark_mode { Color32::WHITE } else { Color32::BLACK },
+                    ..Default::default()
+                })
+                .show(ctx, |ui| {
+                    ui.add_space(5.0);
+                    ui.vertical_centered_justified(|ui| {
+                        ui.heading("LiLearn");
+                    });
+                    ui.add_space(25.0);
 
-                ui.add_space(5.0);
-                ui.vertical_centered_justified(|ui| {
-                    ui.heading("LiLearn");
-                });
-                ui.add_space(25.0);
+                    ui.label(format!("Points: {}", self.points));
 
-
-                ui.label(format!("Points: {}",self.points));
-
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(format!("🔥: {}",self.streak))
-                    .color(Color32::RED)
-                    );
-                });
-
-
-                // show win msgs
-                if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play && !self.in_game {
-                    let mut msg = "You were close!";
-                    let mut msg_color = Color32::DARK_GREEN;
-                    if self.cur_move_cnt == self.optimal_move_cnt {
-                        msg = "Excellent! 🔥🔥🔥";
-                        msg_color = Color32::from_rgb(91, 33, 50)
-                    }
-                    ui.label(
-                        egui::RichText::new(msg)
-                            .color(msg_color)
-                            ,
-                    );
-                }
-
-                match self.last_timed_game {
-                    None => (),
-                    Some(v) => {
-                        ui.add_space(10.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "You won {} round(s) in your last timed game",
-                                v
-                            ))
-                            .color(Color32::DARK_GREEN)
-                        );
-                    }
-                }
-
-                ui.collapsing(" How to play:", |ui| {
-                    ui.label("Try to collect all the stars with as few moves as possible! There's also a timed mode if you are up for the challenge! The timer is set in seconds.");
-                    ui.add_space(2.0);
-                });
-                
-                if !self.in_timed_round {
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
-                        ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
-                        ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
+                        ui.label(egui::RichText::new(format!("🔥: {}", self.streak)).color(Color32::RED));
                     });
 
-                    ui.horizontal(|ui| {
-                        ui.label("Number of stars: ");
-                        ui.add(egui::Slider::new(&mut self.star_cnt, 1..=18));
-                    }); 
-                }
-                egui::Grid::new("my_grid")
-                .num_columns(2)
-                .spacing([23.0, 4.0])
-                .show(ui, |ui| {
-                    // pick board colors
-
-                    ui.label("Dark square color: ");
-                    ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
-                    ui.end_row();
-
-                    ui.label("Light square color: ");
-                    ui.color_edit_button_srgba(&mut self.board_light_sq_color);
-                    ui.end_row();
-
-                    ui.label("Window background color: ");
-                    ui.color_edit_button_srgba(&mut self.window_bg_color);
-                    ui.end_row();
-
-                    ui.label("Arrow color: ");
-                    ui.color_edit_button_srgba(&mut self.arrow_color);
-                    ui.end_row();
-
-                    ui.label("Side panel dark mode: ");
-                    ui.checkbox(&mut self.side_panel_dark_mode, "");
-                    ui.end_row();
-                });
-                ui.horizontal(|ui| {
-                    if !self.timed {
-                        ui.checkbox(&mut self.auto_play, "Auto play");
+                    // show win msgs
+                    if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play && !self.in_game {
+                        let mut msg = "You were close!";
+                        let mut msg_color = Color32::DARK_GREEN;
+                        if self.cur_move_cnt == self.optimal_move_cnt {
+                            msg = "Excellent! 🔥🔥🔥";
+                            msg_color = Color32::from_rgb(91, 33, 50)
+                        }
+                        ui.label(egui::RichText::new(msg).color(msg_color));
                     }
-                    ui.checkbox(&mut self.timed, "Timed rounds");
-                });
 
-                ui.add_space(2.0);
-                ui.vertical_centered_justified(|ui| {
+                    match self.last_timed_game {
+                        None => (),
+                        Some(v) => {
+                            ui.add_space(10.0);
+                            ui.label(egui::RichText::new(format!("You won {} round(s) in your last timed game", v)).color(Color32::DARK_GREEN));
+                        }
+                    }
+
+                    ui.collapsing(" How to play:", |ui| {
+                        ui.label("Try to collect all the stars with as few moves as possible! There's also a timed mode if you are up for the challenge! The timer is set in seconds.");
+                        ui.add_space(2.0);
+                    });
+
                     if !self.in_timed_round {
-                        ui.menu_button("Timer", |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("Set timer: ");
-                                ui.add(egui::Slider::new(&mut self.starting_timer, 1..=500));
-                            });
+                        ui.horizontal(|ui| {
+                            ui.radio_value(&mut self.choice_piece, chess::QUEEN_WHITE, "Queen");
+                            ui.radio_value(&mut self.choice_piece, chess::KNIGHT_WHITE, "Knight");
+                            ui.radio_value(&mut self.choice_piece, chess::ROOK_WHITE, "Rook");
+                        });
 
-                            if ui.button("Close").clicked() {
-                                ui.close_menu();
-                            }
+                        ui.horizontal(|ui| {
+                            ui.label("Number of stars: ");
+                            ui.add(egui::Slider::new(&mut self.star_cnt, 1..=18));
                         });
                     }
+                    egui::Grid::new("my_grid").num_columns(2).spacing([23.0, 4.0]).show(ui, |ui| {
+                        // pick board colors
+
+                        ui.label("Dark square color: ");
+                        ui.color_edit_button_srgba(&mut self.board_dark_sq_color);
+                        ui.end_row();
+
+                        ui.label("Light square color: ");
+                        ui.color_edit_button_srgba(&mut self.board_light_sq_color);
+                        ui.end_row();
+
+                        ui.label("Window background color: ");
+                        ui.color_edit_button_srgba(&mut self.window_bg_color);
+                        ui.end_row();
+
+                        ui.label("Arrow color: ");
+                        ui.color_edit_button_srgba(&mut self.arrow_color);
+                        ui.end_row();
+
+                        ui.label("Side panel dark mode: ");
+                        ui.checkbox(&mut self.side_panel_dark_mode, "");
+                        ui.end_row();
+                    });
+                    ui.horizontal(|ui| {
+                        if !self.timed {
+                            ui.checkbox(&mut self.auto_play, "Auto play");
+                        }
+                        ui.checkbox(&mut self.timed, "Timed rounds");
+                    });
 
                     ui.add_space(2.0);
-                    let new_round_btn = egui::Button::new("New round");
+                    ui.vertical_centered_justified(|ui| {
+                        if !self.in_timed_round {
+                            ui.menu_button("Timer", |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label("Set timer: ");
+                                    ui.add(egui::Slider::new(&mut self.starting_timer, 1..=500));
+                                });
 
-                    if ui.add(new_round_btn).clicked() {
-                        self.last_timed_game = None;
-                        self.cur_timed_num_wins = 0;
-                        
-                        if self.timed {
-                            self.auto_play = true;
-                            self.in_timed_round = true;
-                            #[cfg(not(target_arch = "wasm32"))]
-                            let cur_time = SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .expect("Time went backwards")
-                                .as_secs();
-                            
-                            #[cfg(target_arch = "wasm32")]
-                            let cur_time =  now_sec();
-
-                            self.timer = cur_time;
-                        } else {
-                            self.timed = false;
-                            self.in_timed_round = false;
+                                if ui.button("Close").clicked() {
+                                    ui.close_menu();
+                                }
+                            });
                         }
 
-                        self.in_game = true;
-                        self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
-                        self.cur_move_cnt = 0;
-                        (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
-                        self.arrows_to_draw.clear();
-                    }
-                    ui.add_space(2.0);
+                        ui.add_space(2.0);
+                        let new_round_btn = egui::Button::new("New round");
 
-                    if ui.button("Undo Drawing").clicked() {
-                        self.arrows_to_draw.pop();
-                    }
-                    ui.add_space(2.0);
-                    if ui.button("Clear Drawing").clicked() {
-                        self.arrows_to_draw.clear()
-                    }
-                    ui.add_space(2.0);
-                    if ui.add(Button::new(if self.show_solution { "Hide Solution Path" } else { "Show Solution Path"}).fill(Color32::DARK_RED)).clicked() {
-                        self.show_solution ^= true;
-                    }
+                        if ui.add(new_round_btn).clicked() {
+                            self.last_timed_game = None;
+                            self.cur_timed_num_wins = 0;
 
-                    if self.auto_play && self.board.num_star_cnt == 0 {
-                        self.in_game = true;
-                        self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
-                        self.cur_move_cnt = 0;
-                        (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
-                        self.arrows_to_draw.clear();
-                    }
+                            if self.timed {
+                                self.auto_play = true;
+                                self.in_timed_round = true;
+                                #[cfg(not(target_arch = "wasm32"))]
+                                let cur_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
+
+                                #[cfg(target_arch = "wasm32")]
+                                let cur_time = now_sec();
+
+                                self.timer = cur_time;
+                            } else {
+                                self.timed = false;
+                                self.in_timed_round = false;
+                            }
+
+                            self.in_game = true;
+                            self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
+                            self.cur_move_cnt = 0;
+                            (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
+                            self.arrows_to_draw.clear();
+                        }
+                        ui.add_space(2.0);
+
+                        if ui.button("Undo Drawing").clicked() {
+                            self.arrows_to_draw.pop();
+                        }
+                        ui.add_space(2.0);
+                        if ui.button("Clear Drawing").clicked() {
+                            self.arrows_to_draw.clear()
+                        }
+                        ui.add_space(2.0);
+                        if ui
+                            .add(
+                                Button::new(if self.show_solution {
+                                    RichText::new("Hide Solution Path").color(Color32::WHITE).strong()
+                                } else {
+                                    RichText::new("Show Solution Path").color(Color32::WHITE)
+                                })
+                                .fill(if self.side_panel_dark_mode { Color32::DARK_RED } else { Color32::RED }),
+                            )
+                            .clicked()
+                        {
+                            self.show_solution ^= true;
+                        }
+
+                        if self.auto_play && self.board.num_star_cnt == 0 {
+                            self.in_game = true;
+                            self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
+                            self.cur_move_cnt = 0;
+                            (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
+                            self.arrows_to_draw.clear();
+                        }
+                    });
                 });
-            });
         } else {
             let Vec2 { x, .. } = frame.info().window_info.size;
             egui::containers::SidePanel::left("Phantom")
@@ -494,10 +457,7 @@ impl eframe::App for MyApp {
                 let mut show_progress_bar = false;
                 // get cur time and compare
                 #[cfg(not(target_arch = "wasm32"))]
-                let cur_time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs();
+                let cur_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
 
                 #[cfg(target_arch = "wasm32")]
                 let cur_time = now_sec();
@@ -511,8 +471,7 @@ impl eframe::App for MyApp {
                         // restart and create a new game
                         self.in_game = true;
                         self.board = LiBoard::new(self.star_cnt as i8, self.choice_piece);
-                        (self.optimal_move_cnt, self.solution_path) =
-                            self.board.num_optimal_moves_to_star();
+                        (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
                         self.arrows_to_draw.clear();
                     } else {
                         show_progress_bar = true;
@@ -520,13 +479,9 @@ impl eframe::App for MyApp {
                 }
                 if ui
                     .add(
-                        Button::new(RichText::new(if self.show_side_panel {
-                            "Zen Mode"
-                        } else {
-                            "Menu"
-                        }))
-                        .fill(self.window_bg_color)
-                        .stroke(Stroke::new(0.5, Color32::WHITE)),
+                        Button::new(RichText::new(if self.show_side_panel { "Zen Mode" } else { "Menu" }))
+                            .fill(self.window_bg_color)
+                            .stroke(Stroke::new(0.5, Color32::WHITE)),
                     )
                     .clicked()
                 {
@@ -539,18 +494,11 @@ impl eframe::App for MyApp {
                 ui.label("Optimal: ".to_owned() + &self.optimal_move_cnt.to_string());
                 ui.add_space(3.0);
                 if show_progress_bar {
-                    ui.label(format!(
-                        "Time left: {}",
-                        self.starting_timer - (cur_time - self.timer)
-                    ));
+                    ui.label(format!("Time left: {}", self.starting_timer - (cur_time - self.timer)));
                     ui.add_space(3.0);
                     let ratio_f = (cur_time - self.timer) as f32 / self.starting_timer as f32;
                     match self.board_width {
-                        Some(v) => ui.add(
-                            ProgressBar::new(ratio_f)
-                                .desired_width(v)
-                                .desired_rounding(2.5),
-                        ),
+                        Some(v) => ui.add(ProgressBar::new(ratio_f).desired_width(v).desired_rounding(2.5)),
                         None => ui.add(ProgressBar::new(ratio_f).desired_rounding(2.5)),
                     };
                     ui.add_space(3.0);
@@ -609,9 +557,7 @@ impl eframe::App for MyApp {
                                 // Show the image:
                                 egui::Image::new(texture, texture.size_vec2()).paint_at(ui, sq);
                             }
-                        } else if piece_resp.dragged_by(PointerButton::Primary)
-                            && piece_being_moved != 0
-                        {
+                        } else if piece_resp.dragged_by(PointerButton::Primary) && piece_being_moved != 0 {
                             self.primary_clicked = true;
                             // currently dragging.. draw the texture at current mouse pos
                             if cur_input_pos.is_some() && piece_being_moved != 0 {
@@ -625,10 +571,7 @@ impl eframe::App for MyApp {
                                     x: start_of_rec.x + size,
                                     y: start_of_rec.y + size,
                                 };
-                                let image_rect = Rect {
-                                    min: start_of_rec,
-                                    max: end_of_rec,
-                                };
+                                let image_rect = Rect { min: start_of_rec, max: end_of_rec };
 
                                 piece_state = PieceStates::Dragged(image_rect, piece_being_moved);
                             }
@@ -655,10 +598,7 @@ impl eframe::App for MyApp {
                             }
                         }
                         // Handle primary button drags
-                        else if self.primary_clicked
-                            && piece_resp.drag_released()
-                            && piece_being_moved != STAR_VALUE
-                        {
+                        else if self.primary_clicked && piece_resp.drag_released() && piece_being_moved != STAR_VALUE {
                             self.primary_clicked = false;
                             // done dragging here.. potentially update board state for next frame
                             let a = ctx.input().pointer.interact_pos();
@@ -707,9 +647,7 @@ impl eframe::App for MyApp {
                     }
                     PieceStates::DragReleased(piece_rect, move_piece) => {
                         if self.board.validate_move(&move_piece).is_valid() {
-                            if self.board.board[move_piece.goal_i][move_piece.goal_j]
-                                == chess::STAR_VALUE
-                            {
+                            if self.board.board[move_piece.goal_i][move_piece.goal_j] == chess::STAR_VALUE {
                                 play_sound("capture");
                                 self.board.num_star_cnt -= 1;
                             } else {
@@ -728,8 +666,7 @@ impl eframe::App for MyApp {
                             let img_id = self.board.board[move_piece.goal_i][move_piece.goal_j];
                             if img_id != 0 {
                                 let texture = get_texture(self, ui, img_id);
-                                egui::Image::new(texture, texture.size_vec2())
-                                    .paint_at(ui, piece_rect);
+                                egui::Image::new(texture, texture.size_vec2()).paint_at(ui, piece_rect);
                             }
                         }
                     }

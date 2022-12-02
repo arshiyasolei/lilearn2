@@ -19,11 +19,7 @@ fn main() {
         ..Default::default()
     };
 
-    eframe::run_native(
-        "LiLearn",
-        options,
-        Box::new(|_cc| Box::new(app::MyApp::default())),
-    );
+    eframe::run_native("LiLearn", options, Box::new(|_cc| Box::new(app::MyApp::default())));
 }
 
 // ----------------------------------------------------------------------------
@@ -32,9 +28,5 @@ fn main() {
 pub fn main() {
     let web_options = eframe::WebOptions::default();
     use lib::MyApp;
-    eframe::start_web(
-        "lilearn_id",
-        web_options,
-        Box::new(|cc| Box::new(MyApp::default())),
-    );
+    eframe::start_web("lilearn_id", web_options, Box::new(|cc| Box::new(MyApp::default())));
 }
