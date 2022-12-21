@@ -115,7 +115,7 @@ impl Default for MyApp {
             auto_play: false,
             window_bg_color: Color32::BLACK,
             arrow_color: Color32::from_rgba_premultiplied(81, 171, 0, 104),
-            side_panel_dark_mode: true,
+            side_panel_dark_mode: false,
             show_solution: false,
             // timers
             timed: false,
@@ -245,6 +245,8 @@ impl eframe::App for MyApp {
         } else {
             let mut v = egui::Visuals::dark();
             v.override_text_color = Some(Color32::from_gray(245));
+            v.widgets.inactive.bg_fill = Color32::BLACK;
+            v.widgets.inactive.bg_stroke = Stroke::new(0.8, Color32::WHITE);
             v
         };
         visuals.widgets.noninteractive.bg_stroke.width = 0.0;
@@ -272,16 +274,15 @@ impl eframe::App for MyApp {
                     ui.label(format!("Points: {}", self.points));
 
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(format!("🔥: {}", self.streak)).color(Color32::RED));
+                        ui.label(egui::RichText::new(format!("🔥: {}", self.streak)).color(Color32::RED).strong());
                     });
 
                     // show win msgs
                     if !self.in_timed_round && self.board.num_star_cnt == 0 && !self.auto_play && !self.in_game {
                         let mut msg = "You were close!";
-                        let mut msg_color = Color32::DARK_GREEN;
+                        let msg_color = Color32::RED;
                         if self.cur_move_cnt == self.optimal_move_cnt {
                             msg = "Excellent! 🔥🔥🔥";
-                            msg_color = Color32::from_rgb(91, 33, 50)
                         }
                         ui.label(egui::RichText::new(msg).color(msg_color));
                     }
@@ -481,7 +482,7 @@ impl eframe::App for MyApp {
                     .add(
                         Button::new(RichText::new(if self.show_side_panel { "Zen Mode" } else { "Menu" }))
                             .fill(self.window_bg_color)
-                            .stroke(Stroke::new(0.5, Color32::WHITE)),
+                            .stroke(Stroke::new(0.8, Color32::WHITE)),
                     )
                     .clicked()
                 {
