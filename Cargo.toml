@@ -18,11 +18,11 @@ crate-type = ["cdylib", "rlib"]
 rodio = { version = "0.16.0", default-features = false, features = ["wav"] }
 rand = { version = "0.8.5", default-features = true }
 image = { version = "0.24.1", default-features = true }
-eframe = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
-egui = { git = "https://github.com/emilk/egui.git", rev = "dfc1f2c4703d54b7a7c9fd40e636f434569942b2" }
 itertools = { version = "0.10.5" }
 serde = { version = "1.0.148" , features = ["derive"] }
 rpds = { version = "0.12.0" }
+eframe = { version = "0.20.1" , default-features = false, features = ["accesskit", "default_fonts","wgpu"] } 
+egui = "0.20.1"
 # web:
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]

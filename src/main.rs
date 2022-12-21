@@ -11,9 +11,9 @@ mod egui_widgets;
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     let options = eframe::NativeOptions {
-        // Let's show off that we support transparent windows
         transparent: false,
         drag_and_drop_support: true,
+        multisampling: 0,
         vsync: false,
         initial_window_size: Some(Vec2 { x: 730.0, y: 550.0 }),
         ..Default::default()

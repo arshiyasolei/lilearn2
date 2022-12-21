@@ -245,12 +245,13 @@ impl eframe::App for MyApp {
         } else {
             let mut v = egui::Visuals::dark();
             v.override_text_color = Some(Color32::from_gray(245));
-            v.widgets.inactive.bg_fill = Color32::BLACK;
-            v.widgets.inactive.bg_stroke = Stroke::new(0.8, Color32::WHITE);
+            v.widgets.inactive.bg_fill = Color32::from_gray(25);
+            v.widgets.inactive.bg_stroke = Stroke::new(0.05, Color32::WHITE);
             v
         };
         visuals.widgets.noninteractive.bg_stroke.width = 0.0;
-        ctx.tessellation_options().feathering_size_in_pixels = 0.3;
+        ctx.tessellation_options().epsilon = 0.00000005;
+
         let mut style: egui::Style = (*ctx.style()).clone();
         style.spacing.indent = 11.0;
         ctx.set_style(style);
@@ -357,10 +358,9 @@ impl eframe::App for MyApp {
                             });
                         }
 
-                        ui.add_space(2.0);
-                        let new_round_btn = egui::Button::new("New round");
+                        ui.add_space(3.0);
 
-                        if ui.add(new_round_btn).clicked() {
+                        if ui.button("New round").clicked() {
                             self.last_timed_game = None;
                             self.cur_timed_num_wins = 0;
 
@@ -385,16 +385,16 @@ impl eframe::App for MyApp {
                             (self.optimal_move_cnt, self.solution_path) = self.board.num_optimal_moves_to_star();
                             self.arrows_to_draw.clear();
                         }
-                        ui.add_space(2.0);
+                        ui.add_space(3.0);
 
                         if ui.button("Undo Drawing").clicked() {
                             self.arrows_to_draw.pop();
                         }
-                        ui.add_space(2.0);
+                        ui.add_space(3.0);
                         if ui.button("Clear Drawing").clicked() {
                             self.arrows_to_draw.clear()
                         }
-                        ui.add_space(2.0);
+                        ui.add_space(3.0);
                         if ui
                             .add(
                                 Button::new(if self.show_solution {
